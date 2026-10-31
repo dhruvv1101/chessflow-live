@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+.vercel/
+.DS_Store
+.env*
+!.env.example
+public/engine/stockfish-19*.js
+public/engine/stockfish-19*.wasm

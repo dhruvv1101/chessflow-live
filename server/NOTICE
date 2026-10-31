@@ -1,0 +1,6 @@
+Stockfish is licensed under GNU General Public License version 3 (GPL-3.0).
+This service downloads the official Stockfish 19 Linux x86-64 universal release
+binary from https://github.com/official-stockfish/Stockfish/releases/tag/sf_19
+and verifies its SHA-256 digest during the Docker build.
+Stockfish source: https://github.com/official-stockfish/Stockfish
+The source and license are available from the linked upstream project.

@@ -1,0 +1,9 @@
+ChessFlow Live includes Stockfish.js 19.0.1 Lite single-threaded WebAssembly engine files from the npm package `stockfish@19.0.1`.
+
+Stockfish.js source and build: https://github.com/nmrugg/stockfish.js
+Upstream Stockfish engine: https://github.com/official-stockfish/Stockfish
+Full engine license text: NOTICE-STOCKFISH-LICENSE.txt
+
+The JavaScript and WASM engine files are copied unmodified to public/engine/ by scripts/copy-engine.mjs after npm install. They are licensed under GPL-3.0.
+
+The original flat chess-piece SVG artwork in src/pieces.jsx was created for ChessFlow Live and is licensed under GPL-3.0-only with this project. No third-party chess-piece assets are used.
