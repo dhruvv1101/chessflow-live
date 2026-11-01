@@ -92,6 +92,10 @@ class CoachVariation(BaseModel):
     model_config = ConfigDict(extra="forbid")
     uci: Annotated[list[str], Field(max_length=10)]
     san: Annotated[list[str], Field(max_length=10)]
+    evaluation_cp_white: int | None = None
+    evaluation_mate_white: int | None = None
+    depth: Annotated[int | None, Field(ge=0, le=100)] = None
+    nodes: Annotated[int | None, Field(ge=0)] = None
 
 
 class CoachRequest(BaseModel):
@@ -110,6 +114,7 @@ class CoachRequest(BaseModel):
     side_to_move: Annotated[str, Field(pattern=r"^[wb]$")]
     game_phase: Annotated[str, Field(max_length=20)] = "unknown"
     motifs: Annotated[list[str], Field(max_length=8)] = Field(default_factory=list)
+    user_level: Annotated[str, Field(max_length=20)] = "intermediate"
 
 
 @asynccontextmanager

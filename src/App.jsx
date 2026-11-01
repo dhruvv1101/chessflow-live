@@ -86,8 +86,11 @@ function App() {
     const media = window.matchMedia?.('(prefers-color-scheme: dark)');
     const apply = () => {
       root.dataset.theme = settings.theme;
-      root.dataset.effectiveTheme = settings.theme === 'dark' || (settings.theme === 'system' && media?.matches) ? 'dark' : 'light';
+      const effective = settings.theme === 'dark' || (settings.theme === 'system' && media?.matches) ? 'dark' : 'light';
+      root.dataset.effectiveTheme = effective;
       root.dataset.reduceMotion = String(settings.reduceMotion);
+      document.getElementById('theme-color-light')?.setAttribute('media', settings.theme === 'system' ? '(prefers-color-scheme: light)' : effective === 'light' ? 'all' : 'not all');
+      document.getElementById('theme-color-dark')?.setAttribute('media', settings.theme === 'system' ? '(prefers-color-scheme: dark)' : effective === 'dark' ? 'all' : 'not all');
     };
     apply();
     media?.addEventListener?.('change', apply);
@@ -265,12 +268,12 @@ function App() {
     if (!row?.coachInput) return;
     const key = coachCacheKey(row.coachInput, 'Stockfish 19', { movetime: settings.hintTime, hashMb: ENGINE.hashMb });
     const cached = getCachedCoachExplanation(key);
-    if (cached) { setCoach({ state: 'ready', explanation: cached, error: '' }); return; }
+    if (cached) { setCoach({ state: 'ready', explanation: cached.explanation || cached, provider: cached.provider || 'gemini', error: cached.message || '' }); return; }
     setCoach({ state: 'loading', explanation: null, error: '' });
     try {
       const result = await analyzeCoachMove(row.coachInput, { signal });
-      cacheCoachExplanation(key, result.explanation);
-      setCoach({ state: 'ready', explanation: result.explanation, error: '' });
+      if (result.provider === 'gemini') cacheCoachExplanation(key, result);
+      setCoach({ state: 'ready', explanation: result.explanation, provider: result.provider, error: result.message || '' });
     } catch (error) {
       if (error.name !== 'AbortError') setCoach({ state: 'unavailable', explanation: null, error: error.message });
     }
@@ -655,18 +658,19 @@ function App() {
         const board = new Chess(before);
         const pieces = board.board().flat().filter(Boolean);
         const phase = pieces.length > 24 ? 'opening' : pieces.length > 12 ? 'middlegame' : 'endgame';
+        const bestSan = legalVariation(before, [best?.move || best?.pv?.[0] || played.uci], 1).san[0] || '—';
         const coachInput = {
           fen: after, previousFen: before, moveSan: played.san, moveUci: played.uci,
           bestUci: best?.move || best?.pv?.[0] || played.uci,
           evaluationBefore: bestWhiteCp, evaluationAfter: playedWhiteCp, evaluationLoss: lossCp,
-          variations: variations.map((line) => ({ uci: line.uci, san: line.san })),
-          punishmentVariations: punishmentVariations.map((line) => ({ uci: line.uci, san: line.san })),
-          opponentResponse, sideToMove: played.color, gamePhase: phase, motifs,
+          variations: variations.map((line) => ({ uci: line.uci, san: line.san, evaluation_cp_white: line.cp, evaluation_mate_white: line.mate, depth: line.depth, nodes: line.nodes })),
+          punishmentVariations: punishmentVariations.map((line) => ({ uci: line.uci, san: line.san, evaluation_cp_white: line.cp, evaluation_mate_white: line.mate, depth: line.depth, nodes: line.nodes })),
+          opponentResponse, sideToMove: played.color, gamePhase: phase, motifs, userLevel: difficulty, bestSan,
         };
         const row = { number: Math.floor(index / 2) + 1, ply: index + 1, color: played.color, san: played.san,
           uci: played.uci, fen: after, previousFen: before, eval: formatEvaluation(playedPosition || {}), lossCp,
           beforeEvalText: formatEvaluation(best || {}), bestWhiteCp, label: classifyMove({ lossCp, thresholds: settings.classificationThresholds }), bestUci: coachInput.bestUci,
-          bestSan: legalVariation(before, [coachInput.bestUci], 1).san[0] || '—', variations,
+          bestSan, variations,
           opponentResponse, opponentSan: legalVariation(after, [opponentResponse], 1).san[0] || '—', pv: response?.pv || [],
           punishmentSan: punishmentVariations[0]?.san || [],
           motifs, gamePhase: phase, coachInput, depth: Math.max(best?.depth || 0, playedPosition?.depth || 0) };

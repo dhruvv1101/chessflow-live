@@ -10,6 +10,7 @@ export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOppone
   return <section className="folder-card coach-panel" aria-labelledby="coach-panel-title">
     <div className="folder-head"><div className="icon-box icon-purple" aria-hidden="true">AI</div><div><p className="meta-line">MOVE {row.number}{row.color === 'w' ? ' · WHITE' : ' · BLACK'}</p><h2 id="coach-panel-title">Chess coach</h2></div><span className={`analysis-classification ${badgeClass(row.label)}`}>{row.label}</span></div>
     <p className="coach-summary"><strong>{row.san}</strong> · evaluation loss <strong>{row.lossCp} cp</strong>{row.depth ? ` · depth ${row.depth}` : ''}</p>
+    {coach.provider && <p className={`coach-provider ${coach.provider === 'gemini' ? 'is-gemini' : 'is-stockfish'}`} role="status">Coach: {coach.provider === 'gemini' ? 'Gemini' : 'Stockfish analysis only'}</p>}
     <div className="coach-actions">
       <button className="button button-yellow" onClick={onExplain} disabled={coach.state === 'loading'}>{coach.state === 'loading' ? 'Explaining…' : 'Explain This Move'}</button>
       <button className="button button-outline" onClick={() => { setDetailsOpen(true); onShowOpponentPlan(row); }}>Show Opponent’s Plan</button>
