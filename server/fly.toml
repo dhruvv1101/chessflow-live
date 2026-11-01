@@ -1,4 +1,6 @@
-app = "chessflow-engine"
+app = "chessflow-engine-dhruhv"
+primary_region = "bom"
+
 [build]
   dockerfile = "Dockerfile"
 
