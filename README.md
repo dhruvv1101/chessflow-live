@@ -1,52 +1,62 @@
 # ChessFlow Live
 
-A chess app: play against Stockfish, request MultiPV hints, and review finished PGNs. By default, chess and analysis run in the browser. The native Stockfish API in `server/` is optional; Supabase is the recommended cloud option for per-user saved games, while local browser play and saves work without an account.
+ChessFlow Live is a browser chess app for playing Stockfish, studying engine
+lines, reviewing a finished PGN, and playing pass-and-play. Chess rules and
+Stockfish 19 WASM analysis run in the visitor’s browser. A Vercel function can
+turn verified Stockfish facts into a Gemini explanation; the app still works
+when Gemini is not configured. Supabase is the recommended cloud option for
+saved games. See [the project overview](docs/PROJECT_OVERVIEW.md) for the
+feature inventory and architecture.
 
-## Local development
+## Run locally
 
 Requirements: Node.js 20.19+ or 22.12+.
 
-```bash
-npm install
+```powershell
+npm ci
 npm run dev
 ```
 
-Vite opens the app locally. `postinstall` copies pinned Stockfish 19 Lite and Full JavaScript/WASM builds into the ignored `public/engine/` directory. The Full build is fetched lazily for hints, analysis, or when Strong is selected in Settings. Set `VITE_ENGINE_API_URL` in `.env.local` to use a native analysis API; copy `.env.example` as a starting point. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` to enable Supabase cloud saves. Leave these settings out to use browser-only analysis and local saves.
+`postinstall` copies the pinned Stockfish 19 Lite and Full JavaScript/WASM
+builds into ignored `public/engine/`. The Full build loads when hints or PGN
+analysis need it. Keep `.env.local` private and ignored; do not paste its
+contents into logs or chat.
 
-```bash
-npm test
+## Check and build
+
+```powershell
 npm run lint
+npm test
 npm run build
+npm run test:smoke
 ```
 
-## Difficulty mapping
+The default Playwright suite mocks `/health` and `/analyze`, so it does not
+need Docker or a live engine. The opt-in live checks are clearly separated in
+`playwright/engine-routing.live.spec.js`; enable the relevant test environment
+variable only when the local server is in the expected running/stopped state.
+`playwright/layout-geometry.spec.js` checks light and dark layouts at 390, 1024,
+1280, 1440 and 1920 pixels, and writes its screenshots to `docs/screenshots/`.
+Other Playwright screenshots go to ignored `test-results/`.
 
-| Difficulty | Stockfish Skill Level | Search time |
+## Engine settings
+
+| Opponent setting | Skill | Search time |
 |---|---:|---:|
 | Easy | 3 | 200 ms |
 | Medium | 8 | 400 ms |
 | Hard | 14 | 800 ms |
 | Max | 20 | 1,500 ms |
 
-These values live together in `src/config.js`. The AI opponent uses Lite unless Strong is selected. Hints use Full Stockfish at Skill 20, MultiPV 3, and the Settings search time; the Full worker selects multi-thread only when cross-origin isolation is available. If Full fails, the app labels the Lite fallback. Scores are kept for White's evaluation bar and converted to the side-to-move perspective where appropriate. The future-move box shows up to ten plies from the leading PV.
+Values are in `src/config.js`. The opponent uses Lite unless Strong is selected.
+Hints and PGN review use the Full browser engine, Skill 20, up to three lines,
+and the configured hint time. The Full worker uses multiple threads only when
+cross-origin isolation is available. If it cannot load, the app visibly falls
+back to Lite. Scores remain normalized to White’s perspective internally.
 
-The optional API is in [`server/`](server/README.md). It runs one native engine process, allows only configured website origins, validates positions and search ranges, caps request bodies, and applies per-IP and daily limits. API setup, Fly.io/Render instructions, and client fallback controls are in [server/DEPLOY.md](server/DEPLOY.md). Supabase is the recommended cloud option for saved games; see [Supabase setup](docs/supabase-setup.md).
+## Optional local Docker engine (Windows PowerShell)
 
-## Deploy to Vercel
-
-1. Push this folder as a GitHub repository named `chessflow-live`.
-2. In Vercel, select **Add New → Project**, import `dhruvv1101/chessflow-live`, and authorize access if prompted.
-3. Set **Framework Preset** to **Vite**.
-4. Set **Root Directory** to `./`.
-5. Set **Build Command** to `npm run build` and **Output Directory** to `dist`.
-6. Leave install command at `npm install`; the postinstall script copies browser engine assets. Add `VITE_ENGINE_API_URL` if you use the optional API and `VITE_SUPABASE_URL` plus `VITE_SUPABASE_ANON_KEY` for cloud saves. Redeploy after changing Vite environment variables. `vercel.json` configures COOP/COEP for the optional multi-thread browser engine and immutable caching for `/engine/*`.
-7. Select **Deploy** when you are ready.
-
-The Full build is fetched from the static deployment only when selected/needed. Each Full WASM is about 99 MB; verify the current Vercel file-size limit and plan before importing this build.
-
-## Local Docker engine (Windows PowerShell)
-
-Docker Desktop must be running. From the repository root, these npm scripts build the existing server Dockerfile, start the named container detached on host port 8090, check `/health`, and stop/show logs:
+Docker Desktop must be running. From the repository root:
 
 ```powershell
 npm run engine:build
@@ -56,18 +66,61 @@ npm run engine:logs
 npm run engine:stop
 ```
 
-`engine:start` uses the local image `chessflow-engine:latest`, maps `8090:8080`, names the container `chessflow-engine`, and sets `ALLOWED_ORIGINS=http://localhost:5173`. `engine:check` prints engine name, thread count, hash size, and health response time, or says `Engine server not running`. For local Vite testing, use `VITE_ENGINE_API_URL=http://localhost:8090`.
+The scripts use `chessflow-engine:latest`, map host port 8090 to container port
+8080, name the container `chessflow-engine`, and allow the local Vite origin.
+`engine:check` prints engine, threads, hash and health response time, or reports
+that the server is not running. `VITE_ENGINE_API_URL` is optional for native
+Stockfish hints; the normal app uses browser Stockfish.
 
-## Move review and optional chess coach
+For local Gemini requests through the Docker server, set `VITE_COACH_URL` to
+the local `/api/coach/analyze` route and provide `GEMINI_API_KEY` to the
+container’s server environment. Do not use a `VITE_` name for a Gemini key.
+This local override does not depend on `VITE_ENGINE_API_URL`. The Docker server
+remains local-only; no hosted engine server is required or included in the
+Vercel coach flow. See [server/README.md](server/README.md) and
+[server/DEPLOY.md](server/DEPLOY.md) for local API details and deployment
+preparation files; this repository task does not deploy them.
 
-After pasting a finished PGN, ChessFlow reconstructs every ply from the initial FEN and evaluates the position before and after each move with the Stockfish 19 Full browser build. Move-history buttons, first/previous/next/last controls, arrow keys, Space replay, and graph points select a historical position without changing the game record. Centipawn-loss labels use configurable thresholds in Settings; opening-book labels and tactical-pattern claims are omitted when no database or verified detector is available.
+## Vercel setup
 
-Inaccuracies, mistakes, and blunders show Stockfish lines automatically. If the optional server has `GEMINI_API_KEY` configured server-side, the selected move can also receive a beginner-friendly explanation from `POST /api/coach/analyze`; the browser never receives that key. The request sends FENs, move notation, scores, and Stockfish lines to the configured server, which validates the moves before calling Gemini. The local `engine:start` script forwards `GEMINI_API_KEY` from the terminal environment if present. Without a configured server or model access, the Stockfish analysis still works. To enable a local server, follow [server/README.md](server/README.md) and set `VITE_ENGINE_API_URL` in your local Vite environment. No Gemini key is required for the core application.
+1. Import the existing `chessflow-live` repository as a Vite project.
+2. Use the repository root, `npm run build` and `dist` as the output directory.
+3. Add `GEMINI_API_KEY` as a server-only Vercel environment variable. Optionally
+   configure `GEMINI_MODEL` and `ALLOWED_ORIGINS`. The function defaults to the
+   production site origin when `ALLOWED_ORIGINS` is absent.
+4. If you enable login enforcement with `COACH_REQUIRE_LOGIN`, also configure
+   `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project. These
+   two Vite values are public browser configuration. Never use a service-role
+   key in client code or this coach function.
+5. For cloud saves, follow [Supabase setup](docs/supabase-setup.md) and set the
+   same two public Supabase variable names in Vercel.
+6. Deploy from the Vercel dashboard when you choose. Redeploy after changing
+   function or Vite environment settings. This code change itself does not
+   contact Vercel or deploy anything.
 
-Move review summaries are stored in this browser's local storage and are not official rating data. Opening names, personalized pattern detection, and online training synchronization require data sources or services that are not configured.
+The Vercel function is `api/coach.js`; it validates the supplied chess facts,
+limits Gemini to a short request, filters unverified SAN/UCI claims, and returns
+Stockfish-only explanations on provider failure. Function duration is set to
+30 seconds in `vercel.json`. See [docs/coach.md](docs/coach.md) for security,
+quota and model notes.
 
-## Engine and licensing
+## Import and analysis
 
-This project is licensed under GPL-3.0; see [LICENSE](LICENSE). Stockfish's upstream source is [github.com/nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js), with the upstream Stockfish engine at [github.com/official-stockfish/Stockfish](https://github.com/official-stockfish/Stockfish). The included engine files are from pinned npm package `stockfish@19.0.1`, build `stockfish-19-lite-single`. Its full license is included in [NOTICE-STOCKFISH-LICENSE.txt](NOTICE-STOCKFISH-LICENSE.txt).
+Paste a finished PGN to analyze each move with Stockfish 19 Full. The move list,
+move navigation, keyboard controls and evaluation graph select historical
+positions without changing the underlying game. Loss thresholds are
+configurable in Settings. Opening names and trap claims are omitted when no
+verified opening database is available. Training summaries are local and are
+not official Elo ratings.
 
-The Lite neural network is much smaller than Stockfish's full build; strength and search depth depend on the user's device and the selected time limit. Browser workers can be throttled in background tabs. Hints are recommendations, not guaranteed best play. PGN review uses short, independent before/after searches and can take time for long games.
+## Environment variable names
+
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ENGINE_API_URL` (optional,
+local engine only), `VITE_COACH_URL` (optional, local coach override),
+`GEMINI_API_KEY`, `GEMINI_MODEL`, `ALLOWED_ORIGINS`, `COACH_REQUIRE_LOGIN`,
+`RUN_LIVE_ENGINE_TESTS`, `RUN_LIVE_ENGINE_STOPPED_TESTS`.
+
+## License
+
+ChessFlow Live is GPL-3.0-only. The bundled engine is from `stockfish@19.0.1`;
+see [NOTICE-STOCKFISH-LICENSE.txt](NOTICE-STOCKFISH-LICENSE.txt).
