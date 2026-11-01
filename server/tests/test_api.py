@@ -92,6 +92,22 @@ def test_rate_limiter_returns_429(client, monkeypatch):
     assert response.json()["detail"] == "rate limit exceeded"
 
 
+def test_daily_cap_returns_429(client, monkeypatch):
+    monkeypatch.setattr(api, "DAILY_REQUEST_CAP", 1)
+    assert client[0].post("/analyze", json={"fen": FEN}).status_code == 200
+    response = client[0].post("/analyze", json={"fen": FEN})
+    assert response.status_code == 429
+    assert response.json()["detail"] == "daily request cap exceeded"
+
+
+def test_untrusted_forwarded_for_is_ignored(client, monkeypatch):
+    monkeypatch.delenv("FLY_APP_NAME", raising=False)
+    monkeypatch.delenv("RENDER", raising=False)
+    monkeypatch.setattr(api, "RATE_LIMIT", 1)
+    assert client[0].post("/analyze", json={"fen": FEN}, headers={"X-Forwarded-For": "198.51.100.7"}).status_code == 200
+    assert client[0].post("/analyze", json={"fen": FEN}, headers={"X-Forwarded-For": "203.0.113.9"}).status_code == 429
+
+
 def test_busy_search_returns_503(client, monkeypatch):
     class BusyLock:
         async def acquire(self):

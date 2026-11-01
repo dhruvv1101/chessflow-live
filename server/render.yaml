@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: chessflow-engine
+    runtime: docker
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: ./
+    plan: starter
+    numInstances: 1
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SF_THREADS
+        value: "2"
+      - key: SF_HASH_MB
+        value: "128"
+      - key: DAILY_REQUEST_CAP
+        value: "1000"
+      - key: ALLOWED_ORIGINS
+        sync: false

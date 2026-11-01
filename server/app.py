@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import ipaddress
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -25,6 +26,7 @@ ALLOWED_ORIGINS = {origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "")
 MAX_BODY_BYTES = 16 * 1024
 RATE_LIMIT = 30
 RATE_WINDOW_SECONDS = 60
+DAILY_REQUEST_CAP = max(0, int(os.getenv("DAILY_REQUEST_CAP", "1000")))
 BUSY_TIMEOUT_SECONDS = 2.0
 
 
@@ -86,6 +88,8 @@ class AnalyzeRequest(BaseModel):
 async def lifespan(app: FastAPI):
     app.state.engine_lock = asyncio.Lock()
     app.state.rate_buckets = defaultdict(deque)
+    app.state.daily_counts = defaultdict(int)
+    app.state.daily_date = time.strftime("%Y-%m-%d", time.gmtime())
     if os.getenv("ENVIRONMENT", "production").lower() == "production" and not ALLOWED_ORIGINS:
         raise RuntimeError("ALLOWED_ORIGINS must be set in production.")
     try:
@@ -126,16 +130,36 @@ async def request_guard(request: Request, call_next):
     if content_length > MAX_BODY_BYTES:
         return JSONResponse({"detail": "request body too large"}, status_code=413)
     if request.url.path == "/analyze" and request.method == "POST":
-        forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-        client_ip = forwarded or (request.client.host if request.client else "unknown")
+        client_ip = _client_ip(request)
         now = time.monotonic()
         requests = request.app.state.rate_buckets[client_ip]
         while requests and now - requests[0] >= RATE_WINDOW_SECONDS:
             requests.popleft()
         if len(requests) >= RATE_LIMIT:
             return JSONResponse({"detail": "rate limit exceeded"}, status_code=429, headers={"Retry-After": "60"})
+        today = time.strftime("%Y-%m-%d", time.gmtime())
+        if request.app.state.daily_date != today:
+            request.app.state.daily_date = today
+            request.app.state.daily_counts.clear()
+        if DAILY_REQUEST_CAP and sum(request.app.state.daily_counts.values()) >= DAILY_REQUEST_CAP:
+            return JSONResponse({"detail": "daily request cap exceeded"}, status_code=429, headers={"Retry-After": "86400"})
         requests.append(now)
+        request.app.state.daily_counts[today] += 1
     return await call_next(request)
+
+
+def _client_ip(request: Request) -> str:
+    """Trust provider headers only when this process is running on that provider."""
+    if os.getenv("FLY_APP_NAME"):
+        candidate = request.headers.get("fly-client-ip", "")
+    elif os.getenv("RENDER") == "true":
+        candidate = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    else:
+        candidate = ""
+    try:
+        return str(ipaddress.ip_address(candidate)) if candidate else (request.client.host if request.client else "unknown")
+    except ValueError:
+        return request.client.host if request.client else "unknown"
 
 
 @app.get("/health")
