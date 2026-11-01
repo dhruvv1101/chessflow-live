@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#10130e" />
+    <meta id="theme-color-light" name="theme-color" content="#FFD21F" media="(prefers-color-scheme: light)" />
+    <meta id="theme-color-dark" name="theme-color" content="#0A0A14" media="(prefers-color-scheme: dark)" />
     <meta name="description" content="Play chess against Stockfish in your browser." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
@@ -18,9 +19,12 @@
           if (saved?.version === 1 && typeof saved.settings?.reduceMotion === 'boolean') reduceMotion = saved.settings.reduceMotion;
         } catch { /* use system defaults when storage is unavailable */ }
         const applyTheme = () => {
+          const effective = theme === 'dark' || (theme === 'system' && media.matches) ? 'dark' : 'light';
           root.dataset.theme = theme;
-          root.dataset.effectiveTheme = theme === 'dark' || (theme === 'system' && media.matches) ? 'dark' : 'light';
+          root.dataset.effectiveTheme = effective;
           root.dataset.reduceMotion = String(reduceMotion);
+          document.getElementById('theme-color-light')?.setAttribute('media', theme === 'system' ? '(prefers-color-scheme: light)' : effective === 'light' ? 'all' : 'not all');
+          document.getElementById('theme-color-dark')?.setAttribute('media', theme === 'system' ? '(prefers-color-scheme: dark)' : effective === 'dark' ? 'all' : 'not all');
         };
         applyTheme();
         media.addEventListener?.('change', () => { if (theme === 'system') applyTheme(); });

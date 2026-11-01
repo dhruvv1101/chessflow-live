@@ -754,3 +754,63 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 :root[data-effective-theme="dark"][data-reduce-motion="true"] .option-button:hover:not(:disabled),
 :root[data-effective-theme="dark"][data-reduce-motion="true"] .button:active:not(:disabled),
 :root[data-effective-theme="dark"][data-reduce-motion="true"] .option-button:active:not(:disabled) { transition: none !important; transform: none !important; }
+
+/* Responsive layout refinements. These rules change geometry only. */
+.setup-review-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 18px; }
+.setup-review-grid .pgn-bar { min-width: 0; margin-top: 0; }
+.evaluation-card .game-message-card { margin-top: 12px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+@media (min-width: 1100px) {
+  .setup-review-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  .setup-review-grid > .folder-card, .setup-review-grid > .pgn-bar { min-height: 100%; }
+  .setup-review-grid .pgn-bar { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+  .setup-review-grid .pgn-prompt { flex: 0 0 auto; }
+  .setup-review-grid .pgn-bar textarea { flex: 1 1 auto; min-height: 100px; max-height: none; resize: vertical; }
+  .setup-review-grid .review-button { align-self: flex-end; }
+}
+@media (min-width: 1400px) {
+  .app-shell { width: min(100% - 36px, 1560px); }
+  .game-layout { grid-template-columns: minmax(0, 1fr) 580px; gap: 22px; }
+  .side-grid { grid-template-columns: minmax(0, 1fr) 220px; grid-template-rows: auto minmax(390px, auto) auto; align-items: stretch; }
+  .analysis-panel { grid-column: 1 / -1; grid-row: 1; }
+  .moves-panel { grid-column: 1; grid-row: 2; display: flex; min-height: 390px; flex-direction: column; }
+  .moves-panel .move-list { height: 0; min-height: 0; max-height: none; flex: 1 1 auto; }
+  .action-card { grid-column: 2; grid-row: 2; display: flex; min-height: 390px; flex-direction: column; }
+  .action-card .action-helper { display: none; }
+  .action-card .action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .runtime-panel { grid-column: 1 / -1; grid-row: 3; }
+}
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .side-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .analysis-panel { grid-column: 1; grid-row: 1; }
+  .moves-panel { grid-column: 1; grid-row: 2; }
+  .runtime-panel { grid-column: 1; grid-row: 4; }
+  .action-card { grid-column: 1; grid-row: 3; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; gap: 8px; min-height: 0; }
+  .action-card.is-local { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .action-card .folder-head { grid-column: 1 / -1; margin-bottom: 0; }
+  .action-card .hint-button { width: 100%; min-height: 42px; padding-inline: 5px; font-size: 10px; }
+  .action-card .action-grid { display: contents; }
+  .action-card .action-grid .button, .action-card .hint-button { box-sizing: border-box; height: 42px; min-height: 42px; }
+  .action-card .action-grid .button { width: 100%; padding-inline: 4px; font-size: 9px; }
+  .action-card .action-new { grid-column: auto; }
+  .action-card .action-helper { display: none; }
+  .action-card .hints-disabled { grid-column: 1 / -1; }
+}
+@media (max-width: 1023px) {
+  .game-layout { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .side-grid { padding-top: 4px; }
+  .side-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .side-grid > .analysis-panel { grid-column: 1; }
+  .side-grid > .action-card { grid-row: 1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: center; gap: 8px; min-height: 0; }
+  .side-grid > .action-card.is-local { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .side-grid > .action-card .folder-head { grid-column: 1 / -1; margin-bottom: 0; }
+  .side-grid > .action-card .hint-button { width: 100%; min-height: 42px; padding-inline: 4px; font-size: 9px; }
+  .side-grid > .action-card .action-grid { display: contents; }
+  .side-grid > .action-card .action-grid .button, .side-grid > .action-card .hint-button { box-sizing: border-box; height: 42px; min-height: 42px; }
+  .side-grid > .action-card .action-grid .button { width: 100%; padding-inline: 3px; font-size: 8px; }
+  .side-grid > .action-card .action-new { grid-column: auto; }
+  .side-grid > .action-card .action-helper { display: none; }
+  .side-grid > .action-card .hints-disabled { grid-column: 1 / -1; }
+  .side-grid > .moves-panel { grid-row: 2; }
+  .side-grid > .runtime-panel { grid-row: 3; }
+  :root[data-effective-theme="dark"] .evaluation-card .game-message-card { border: 0; background: transparent; box-shadow: none; }
+}
