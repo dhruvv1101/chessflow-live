@@ -12,8 +12,9 @@ import { DEFAULT_SETTINGS, loadSettings, resetSettings as resetSavedSettings, sa
 import { DEFAULT_LOCAL_OPTIONS, LOCAL_GAME_VERSION, addClockIncrement, clearLocalGame, isCurrentHintResult, localClockStart, readLocalGame, resolveDrawOffer, restoreChess, restoreClockAfterUndo, tickClock, writeLocalGame } from './localGame.js';
 import { buildTimeline, calculateEvaluationLoss, classifyMove, legalVariation, scoreToWhiteCp } from './analysis.js';
 import { analyzeCoachMove, cacheCoachExplanation, coachCacheKey, getCachedCoachExplanation } from './engine/coach.js';
-import { recordTrainingGame } from './training.js';
+import { recordPracticeResult, recordTrainingGame } from './training.js';
 import { buildGamePgn, resultForGame } from './pgn.js';
+import { acceptPracticeMove, captureReviewState, createPracticeSession, judgePracticeMove, keepPracticeMove, practiceMove, restoreReviewState, revealPracticeMove, retryPracticeMove } from './practice.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -52,6 +53,11 @@ function App() {
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [coach, setCoach] = useState({ state: 'idle', explanation: null, error: '' });
   const [practiceSession, setPracticeSession] = useState(null);
+  const [practiceBusy, setPracticeBusy] = useState(false);
+  const [practiceMovePending, setPracticeMovePending] = useState(false);
+  const [practiceFeedback, setPracticeFeedback] = useState('');
+  const [practiceHintLevel, setPracticeHintLevel] = useState(0);
+  const [betterMoveRow, setBetterMoveRow] = useState(null);
   const [pgnActionMessage, setPgnActionMessage] = useState('');
   const [copyFailurePgn, setCopyFailurePgn] = useState('');
   const [mode, setMode] = useState('ai');
@@ -63,6 +69,9 @@ function App() {
   const positionIdRef = useRef(0);
   const navigationRequestRef = useRef(0);
   const reviewRunRef = useRef(0);
+  const practiceRequestIdRef = useRef(0);
+  const practiceReturnRef = useRef(null);
+  const pendingPracticeMoveRef = useRef(null);
   const startFenRef = useRef(initialGame().fen());
   const [clockPulse, setClockPulse] = useState(0);
   const lastClockTickRef = useRef(Date.now());
@@ -70,35 +79,45 @@ function App() {
   const chess = chessRef.current;
   const status = getGameStatus(chess);
   const sideToMove = chess.turn();
-  const controllerColor = practiceSession?.color || (mode === 'local' ? sideToMove : human);
-  const isPlayerTurn = Boolean(practiceSession) || mode === 'local' || sideToMove === human;
+  const controllerColor = practiceSession ? practiceSession.phase === 'find' ? practiceSession.side : practiceSession.fen.split(' ')[1] : mode === 'local' ? sideToMove : human;
+  const isPlayerTurn = practiceSession ? practiceSession.fen.split(' ')[1] === practiceSession.color && practiceSession.phase === 'play' || practiceSession.phase === 'find' : mode === 'local' || sideToMove === human;
   const config = DIFFICULTIES[difficulty];
   const gameOver = status.kind === 'checkmate' || status.kind === 'stalemate' || status.kind === 'draw' || resigned;
   const moves = useMemo(() => getMoveList(chess), [fen]);
   const timeline = useMemo(() => reviewTimeline || buildTimeline(startFenRef.current, chess.history()), [fen, gameVersion, reviewTimeline]);
   const isReviewTimeline = Boolean(reviewTimeline);
+  const practiceTimeline = useMemo(() => practiceSession ? buildTimeline(practiceSession.startFen, practiceSession.sanHistory || []) : null, [practiceSession]);
+  const visibleTimeline = practiceTimeline || timeline;
+  const visiblePly = practiceTimeline ? practiceSession.sanHistory?.length || 0 : Math.max(0, Math.min(timeline.moves.length, selectedPly ?? timeline.moves.length));
   const exportSource = useMemo(() => {
+    if (practiceSession) {
+      const game = new Chess(practiceSession.startFen);
+      for (const san of practiceSession.sanHistory || []) game.move(san);
+      return { game, startFen: practiceSession.startFen };
+    }
     if (!reviewTimeline) return { game: chess, startFen: startFenRef.current };
     const game = new Chess(reviewTimeline.initialFen);
     for (const move of reviewTimeline.moves) game.move(move.san);
     return { game, startFen: reviewTimeline.initialFen };
-  }, [chess, fen, gameVersion, reviewTimeline]);
+  }, [chess, fen, gameVersion, practiceSession, reviewTimeline]);
   const activePly = Math.max(0, Math.min(timeline.moves.length, selectedPly ?? timeline.moves.length));
   const boardFen = practiceSession?.fen || timeline.fens[activePly] || fen;
   const displayChess = useMemo(() => new Chess(boardFen), [boardFen]);
   const displayStatus = getGameStatus(displayChess);
   const displaySideToMove = displayChess.turn();
+  const boardGameOver = ['checkmate', 'stalemate', 'draw'].includes(displayStatus.kind) || practiceSession?.phase === 'done' || resigned;
   const gamePgn = useMemo(() => {
-    const white = mode === 'local' ? (localSession?.options.whiteName || 'White') : human === 'w' ? 'You' : `Stockfish (skill ${config.skill})`;
-    const black = mode === 'local' ? (localSession?.options.blackName || 'Black') : human === 'b' ? 'You' : `Stockfish (skill ${config.skill})`;
+    const playerSide = practiceSession?.color || human;
+    const white = mode === 'local' ? (localSession?.options.whiteName || 'White') : playerSide === 'w' ? 'You' : `Stockfish (skill ${config.skill})`;
+    const black = mode === 'local' ? (localSession?.options.blackName || 'Black') : playerSide === 'b' ? 'You' : `Stockfish (skill ${config.skill})`;
     return buildGamePgn(exportSource.game, {
       startFen: exportSource.startFen,
       white,
       black,
-      result: resultForGame({ status: isReviewTimeline ? getGameStatus(exportSource.game) : status, resigned, localOutcome, resignedColor }),
+      result: practiceSession?.phase === 'done' ? practiceSession.result : resultForGame({ status: practiceSession ? getGameStatus(exportSource.game) : isReviewTimeline ? getGameStatus(exportSource.game) : status, resigned, localOutcome, resignedColor }),
     });
-  }, [config.skill, exportSource, human, isReviewTimeline, localOutcome, localSession, mode, resigned, resignedColor, status]);
-  const hasGameMoves = exportSource.game.history().length > 0;
+  }, [config.skill, exportSource, human, isReviewTimeline, localOutcome, localSession, mode, practiceSession, resigned, resignedColor, status]);
+  const hasGameMoves = exportSource.game.history().length > 0 || Boolean(practiceSession);
   const isViewingHistory = !practiceSession && (isReviewTimeline || selectedPly !== null);
   const currentDisplayFenRef = useRef(boardFen);
   currentDisplayFenRef.current = boardFen;
@@ -294,11 +313,117 @@ function App() {
 
   const selectedReviewRow = reviewRows.find((row) => row.ply === activePly) || null;
   const startPractice = useCallback((row) => {
-    if (!row?.previousFen || !row?.bestUci) return;
-    setPracticeSession({ fen: row.previousFen, bestUci: row.bestUci, bestSan: row.bestSan, color: row.color });
-    setSelectedPly(Math.max(0, row.ply - 1));
-    setNotice(`Practice position: find Stockfish's best move for ${row.color === 'w' ? 'White' : 'Black'}.`);
-  }, []);
+    if (!row?.previousFen || !row?.bestUci || !['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label)) return;
+    practiceRequestIdRef.current += 1; setPracticeBusy(false); setPracticeMovePending(false);
+    practiceReturnRef.current = captureReviewState({ selectedPly, scrollTop: moveListRef.current?.scrollTop || 0 });
+    const lines = (row.variations || []).map((line) => ({ uci: line.uci?.[0], san: line.san?.[0], cp: line.cp, mate: line.mate })).filter((line) => line.uci);
+    setPracticeSession(createPracticeSession({ startFen: row.previousFen, color: row.color, bestUci: row.bestUci, bestSan: row.bestSan, lines, bestScore: row.bestScore || { cp: row.bestWhiteCp }, originalMoveUci: row.uci, originalMoveSan: row.san, difficulty, gameKey: pgn || 'live-game', ply: row.ply }));
+    setPracticeFeedback('Find a better move for this position.'); setPracticeHintLevel(0); setSelectedSquare(null);
+    setNotice(`Practice mode: find a better move for ${row.color === 'w' ? 'White' : 'Black'}.`);
+  }, [difficulty, pgn, selectedPly]);
+  const backToReview = () => {
+    practiceRequestIdRef.current += 1;
+    setPracticeBusy(false); setPracticeSession(null); setPracticeFeedback(''); setPracticeHintLevel(0); pendingPracticeMoveRef.current = null;
+    const restored = restoreReviewState(practiceReturnRef.current);
+    setSelectedPly(restored.selectedPly);
+    requestAnimationFrame(() => { if (moveListRef.current) moveListRef.current.scrollTop = restored.scrollTop; });
+    setNotice('Back to your game review.');
+  };
+  const markPracticeDone = (session, result) => {
+    const done = { ...session, phase: 'done', result };
+    const playerWon = result === '1-0' ? session.color === 'w' : result === '0-1' ? session.color === 'b' : null;
+    recordPracticeResult({ gameKey: session.gameKey, ply: session.ply, attempts: session.attempts, hintsUsed: session.hintsUsed, foundBestFirstTry: session.foundBestFirstTry, result: playerWon === null ? 'draw' : playerWon ? 'win' : 'loss' });
+    setPracticeSession(done); setPracticeBusy(false);
+    setPracticeFeedback(result === '1/2-1/2' ? 'Practice game drawn.' : `Practice game finished: ${result}.`);
+  };
+  const handlePracticeMove = async (from, to, promotionPieceType = null) => {
+    const session = practiceSession;
+    if (!session || practiceBusy || session.phase === 'done') return false;
+    const trial = new Chess(session.fen);
+    const candidates = trial.moves({ square: from, verbose: true }).filter((move) => move.to === to);
+    if (!candidates.length) return false;
+    if (!promotionPieceType && candidates.some((move) => move.promotion)) { setPromotion({ from, to, color: trial.turn(), practice: true }); return false; }
+    const move = makeLegalMove(trial, { from, to, ...(promotionPieceType ? { promotion: promotionPieceType } : {}) });
+    if (!move) return false;
+    const moveUci = `${move.from}${move.to}${move.promotion || ''}`;
+    const moveRecord = { uci: moveUci, san: move.san, fen: trial.fen() };
+    if (session.phase === 'play') {
+      let next = practiceMove(session, moveRecord);
+      const terminal = getGameStatus(trial);
+      if (terminal.kind === 'checkmate') { markPracticeDone(next, terminal.winner === 'White' ? '1-0' : '0-1'); setPracticeFeedback(`Checkmate. ${terminal.winner} wins.`); return true; }
+      if (['stalemate', 'draw'].includes(terminal.kind)) { markPracticeDone(next, '1/2-1/2'); setPracticeFeedback(`${terminal.kind === 'stalemate' ? 'Stalemate' : terminal.reason}. Draw.`); return true; }
+      setPracticeSession(next); setPracticeFeedback(''); return true;
+    }
+    const isSameGameMove = moveUci === session.originalMoveUci;
+    const cached = session.cachedLines.find((line) => line.uci === moveUci);
+    let playedScore = cached ? { cp: cached.cp, mate: cached.mate } : null;
+    if (!cached) {
+      const requestId = ++practiceRequestIdRef.current;
+      setPracticeBusy(true); setPracticeFeedback('Checking your move...');
+      try {
+        const result = await search(moveRecord.fen, { movetime: settings.hintTime, skill: 20, multipv: ENGINE.multiPv, color: moveRecord.fen.split(' ')[1] }, 'hint', positionIdRef.current);
+        if (requestId !== practiceRequestIdRef.current || !practiceSession || practiceSession.startFen !== session.startFen) return false;
+        const line = result.lines?.[0];
+        playedScore = { cp: line?.cp, mate: line?.mate };
+      } catch (error) {
+        if (error.name === 'AbortError') return false;
+        setPracticeBusy(false); setPracticeFeedback('Could not check that move. Try again.'); return false;
+      }
+    }
+    const bestLine = session.cachedLines[0];
+    const judgment = judgePracticeMove({ color: session.color, moveUci, bestUci: session.bestUci, lines: session.cachedLines, bestScore: session.bestScore || { cp: bestLine?.cp }, playedScore: playedScore || { cp: bestLine?.cp } });
+    setPracticeBusy(false);
+    if (judgment.accepted) {
+      setPracticeMovePending(false);
+      setPracticeSession(acceptPracticeMove(session, moveRecord, judgment));
+      setPracticeFeedback(judgment.label);
+      return true;
+    }
+    pendingPracticeMoveRef.current = moveRecord;
+    setPracticeMovePending(true);
+    setPracticeFeedback(isSameGameMove ? 'That is the move from the game. Not the best yet.' : `${judgment.message || 'Not the best yet'}. Try another move, reveal the best move, or keep your move.`);
+    return false;
+  };
+  const retryPractice = () => { if (!practiceSession) return; practiceRequestIdRef.current += 1; pendingPracticeMoveRef.current = null; setPracticeMovePending(false); setPracticeSession(retryPracticeMove(practiceSession)); setPracticeFeedback('Try another move.'); };
+  const keepPractice = () => { if (!practiceSession || !pendingPracticeMoveRef.current) return; setPracticeSession(keepPracticeMove(practiceSession, pendingPracticeMoveRef.current)); pendingPracticeMoveRef.current = null; setPracticeMovePending(false); setPracticeFeedback('Move kept. Continue the game.'); };
+  const revealPractice = () => {
+    if (!practiceSession) return;
+    const board = new Chess(practiceSession.startFen);
+    const move = board.move({ from: practiceSession.bestUci.slice(0, 2), to: practiceSession.bestUci.slice(2, 4), ...(practiceSession.bestUci[4] ? { promotion: practiceSession.bestUci[4] } : {}) });
+    if (!move) { setPracticeFeedback('The saved engine move is no longer legal.'); return; }
+    setPracticeSession(revealPracticeMove(practiceSession, { bestFen: board.fen(), bestSan: move.san }));
+    pendingPracticeMoveRef.current = null; setPracticeMovePending(false); setPracticeFeedback(`Best move: ${move.san}. Continue the game.`);
+  };
+  const practiceHint = async () => {
+    if (!practiceSession || practiceBusy) return;
+    if (practiceSession.phase === 'find') {
+      const level = Math.min(3, practiceHintLevel + 1);
+      setPracticeHintLevel(level);
+      setPracticeSession((current) => ({ ...current, hintsUsed: current.hintsUsed + 1, hintLevel: level, showBest: level >= 2 }));
+      const board = new Chess(practiceSession.startFen);
+      const piece = board.get(practiceSession.bestUci.slice(0, 2));
+      setPracticeFeedback(level === 1 ? `Hint: move your ${piece?.type || 'piece'}.` : level === 2 ? `Hint: aim for ${practiceSession.bestUci.slice(2, 4)}.` : `Best move: ${practiceSession.bestSan} (${formatEvaluation(practiceSession.bestScore || { cp: 0 })}).`);
+      return;
+    }
+    setPracticeSession((current) => ({ ...current, hintsUsed: current.hintsUsed + 1 }));
+    await requestHint(true);
+  };
+  const practiceUndo = () => {
+    if (!practiceSession) return;
+    const remaining = Math.max(0, practiceSession.history.length - 2);
+    const game = new Chess(practiceSession.startFen);
+    for (const san of (practiceSession.sanHistory || []).slice(0, remaining)) game.move(san);
+    setPracticeSession({ ...practiceSession, fen: game.fen(), history: practiceSession.history.slice(0, remaining), sanHistory: (practiceSession.sanHistory || []).slice(0, remaining), phase: remaining ? 'play' : 'find' });
+    setPracticeFeedback('Last full move pair undone.');
+  };
+  const restartPractice = () => { if (!practiceSession) return; practiceRequestIdRef.current += 1; setPracticeSession({ ...practiceSession, fen: practiceSession.startFen, history: [], sanHistory: [], phase: 'find', attempts: 0, hintsUsed: 0, revealed: false, missed: false }); setPracticeHintLevel(0); setPracticeFeedback('Practice restarted. Find a better move.'); };
+  const practiceResign = () => markPracticeDone(practiceSession, practiceSession.color === 'w' ? '0-1' : '1-0');
+  const navigatePracticeMistake = (direction) => {
+    const mistakes = reviewRows.filter((row) => ['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label));
+    const index = mistakes.findIndex((row) => row.ply === practiceSession?.ply);
+    const next = mistakes[index + direction];
+    if (next) startPractice(next);
+  };
   const explainMove = useCallback(async (row, signal) => {
     if (!row?.coachInput) return;
     const key = coachCacheKey(row.coachInput, 'Stockfish 19', { movetime: settings.hintTime, hashMb: ENGINE.hashMb });
@@ -316,7 +441,7 @@ function App() {
 
   const onShowBetterMove = useCallback((row) => {
     if (!row?.previousFen || !row.bestUci) return;
-    setPracticeSession({ fen: row.previousFen, bestUci: row.bestUci, bestSan: row.bestSan, color: row.color, showBest: true });
+    setBetterMoveRow(row);
     setSelectedPly(Math.max(0, row.ply - 1));
     setNotice(`Best move: ${row.bestSan}. The board now shows the position before this move.`);
   }, []);
@@ -335,7 +460,7 @@ function App() {
 
   useEffect(() => {
     const active = chessRef.current;
-    if (mode === 'local' || gameOver || sideToMove === human || reviewState !== 'idle') return undefined;
+    if (practiceSession || mode === 'local' || gameOver || sideToMove === human || reviewState !== 'idle') return undefined;
     let cancelled = false;
     const searchFen = active.fen();
     setThinking(true);
@@ -355,7 +480,31 @@ function App() {
       })
       .finally(() => { if (!cancelled) setThinking(false); });
     return () => { cancelled = true; };
-  }, [fen, human, gameOver, gameVersion, reviewState, config, search, publishPosition, sideToMove, mode]);
+  }, [fen, human, gameOver, gameVersion, reviewState, config, search, publishPosition, sideToMove, mode, practiceSession]);
+
+  useEffect(() => {
+    if (!practiceSession || practiceSession.phase !== 'play' || practiceSession.fen.split(' ')[1] === practiceSession.color) return undefined;
+    let cancelled = false;
+    const requestId = ++practiceRequestIdRef.current;
+    const searchFen = practiceSession.fen;
+    setPracticeBusy(true);
+    setPracticeFeedback('Stockfish is thinking…');
+    search(searchFen, { ...(DIFFICULTIES[practiceSession.difficulty] || config), multipv: 1, color: searchFen.split(' ')[1] }, 'play', positionIdRef.current)
+      .then(({ best }) => {
+        if (cancelled || requestId !== practiceRequestIdRef.current) return;
+        const reply = new Chess(searchFen);
+        const move = makeLegalMove(reply, best);
+        if (!move) throw new Error('Stockfish returned an illegal practice reply.');
+        let next = practiceMove(practiceSession, { uci: `${move.from}${move.to}${move.promotion || ''}`, san: move.san, fen: reply.fen() });
+        const terminal = getGameStatus(reply);
+        if (terminal.kind === 'checkmate') markPracticeDone(next, terminal.winner === 'White' ? '1-0' : '0-1');
+        else if (['stalemate', 'draw'].includes(terminal.kind)) markPracticeDone(next, '1/2-1/2');
+        else { setPracticeSession(next); setPracticeFeedback('Your move.'); }
+      })
+      .catch((error) => { if (!cancelled && error.name !== 'AbortError') setPracticeFeedback(`Practice engine unavailable: ${error.message}`); })
+      .finally(() => { if (!cancelled && requestId === practiceRequestIdRef.current) setPracticeBusy(false); });
+    return () => { cancelled = true; practiceRequestIdRef.current += 1; };
+  }, [practiceSession, search, config]);
 
   useEffect(() => {
     if (moveListRef.current) moveListRef.current.scrollTop = moveListRef.current.scrollHeight;
@@ -451,15 +600,7 @@ function App() {
 
   const chooseMove = (from, to) => {
     if (practiceSession) {
-      const trial = new Chess(practiceSession.fen);
-      const candidateMoves = trial.moves({ square: from, verbose: true }).filter((move) => move.to === to);
-      if (!candidateMoves.length) return false;
-      if (candidateMoves.some((move) => move.promotion)) { setPromotion({ from, to, color: practiceSession.color, practice: true }); return false; }
-      const attempted = makeLegalMove(trial, { from, to });
-      if (!attempted) return false;
-      const uci = `${attempted.from}${attempted.to}${attempted.promotion || ''}`;
-      if (uci === practiceSession.bestUci) { setPracticeSession(null); setSelectedPly(null); setNotice(`Correct: ${attempted.san} is the engine's best move.`); return true; }
-      setNotice(`${attempted.san} is legal, but Stockfish prefers ${practiceSession.bestSan}. Try again.`);
+      void handlePracticeMove(from, to);
       return false;
     }
     if (!from || !to || isViewingHistory || gameOver || (thinking && mode !== 'local') || !isPlayerTurn || reviewState === 'reviewing') return false;
@@ -489,7 +630,7 @@ function App() {
   const squareAtPoint = (x, y) => document.elementFromPoint(x, y)?.closest('[data-square]')?.dataset.square ?? null;
 
   const onBoardPointerDown = (event) => {
-    if (isViewingHistory || !event.isPrimary || event.button !== 0 || !isPlayerTurn || gameOver || (thinking && mode !== 'local') || reviewState === 'reviewing') return;
+    if (isViewingHistory || !event.isPrimary || event.button !== 0 || !isPlayerTurn || boardGameOver || practiceBusy || (thinking && mode !== 'local') || reviewState === 'reviewing') return;
     const square = event.target.closest('[data-square]')?.dataset.square;
     if (!square) return;
     const interactionGame = practiceSession ? new Chess(practiceSession.fen) : chessRef.current;
@@ -583,11 +724,7 @@ function App() {
 
   const promote = (piece) => {
     if (promotion?.practice && practiceSession) {
-      const trial = new Chess(practiceSession.fen);
-      const move = makeLegalMove(trial, { from: promotion.from, to: promotion.to, promotion: piece });
-      if (move && `${move.from}${move.to}${move.promotion || ''}` === practiceSession.bestUci) {
-        setPracticeSession(null); setSelectedPly(null); setNotice(`Correct: ${move.san} is the engine's best move.`);
-      } else setNotice(`Try the engine's best move: ${practiceSession.bestSan}.`);
+      void handlePracticeMove(promotion.from, promotion.to, piece);
       setPromotion(null); return;
     }
     const move = makeLegalMove(chessRef.current, { from: promotion.from, to: promotion.to, promotion: piece });
@@ -595,7 +732,8 @@ function App() {
     setPromotion(null);
   };
 
-  const requestHint = async () => {
+  const requestHint = async (allowPractice = false) => {
+    if (practiceSession && !allowPractice) { await practiceHint(); return; }
     if ((!isViewingHistory && gameOver) || reviewState === 'reviewing') return;
     const searchPositionId = positionIdRef.current;
     const searchColor = displaySideToMove;
@@ -622,7 +760,7 @@ function App() {
   };
 
   const undo = () => {
-    if (practiceSession) { setPracticeSession(null); setNotice('Practice challenge closed.'); return; }
+    if (practiceSession) { practiceUndo(); return; }
     Object.values(engineRefs.current).forEach((engine) => engine?.cancel());
     const game = chessRef.current;
     if (game.history().length === 0) return;
@@ -650,6 +788,8 @@ function App() {
       if (!parsed.history().length || !['1-0', '0-1', '1/2-1/2', '*', undefined].includes(parsed.header().Result)) throw new Error('Import a game with a recorded result (1-0, 0-1, 1/2-1/2, or *).');
     } catch (error) { setNotice(`PGN error: ${error.message}`); return; }
     const header = parsed.header();
+    practiceRequestIdRef.current += 1;
+    setPracticeSession(null); setPracticeBusy(false); setPracticeFeedback('');
     setPgn(sourcePgn);
     setReviewGameInProgress(header.Result === '*' || !header.Result);
     const history = parsed.history();
@@ -678,7 +818,12 @@ function App() {
         setReviewProgress(`Evaluating move ${index + 1} of ${history.length}`);
         const beforeEval = await search(before, { movetime: settings.hintTime, skill: 20, multipv: 3, color: before.split(' ')[1] }, 'navigation');
         if (reviewRun !== reviewRunRef.current) return;
-        const afterEval = await search(after, { movetime: settings.hintTime, skill: 20, multipv: 3, color: after.split(' ')[1] }, 'navigation');
+        const terminalAfter = getGameStatus(new Chess(after));
+        const afterEval = terminalAfter.kind === 'checkmate'
+          ? { lines: [{ cp: null, mate: terminalAfter.winner === 'White' ? 1 : -1, pv: [], depth: beforeEval.lines?.[0]?.depth || 0 }] }
+          : ['stalemate', 'draw'].includes(terminalAfter.kind)
+            ? { lines: [{ cp: 0, mate: null, pv: [], depth: beforeEval.lines?.[0]?.depth || 0 }] }
+            : await search(after, { movetime: settings.hintTime, skill: 20, multipv: 3, color: after.split(' ')[1] }, 'navigation');
         if (reviewRun !== reviewRunRef.current) return;
         const best = beforeEval.lines?.[0];
         const playedPosition = afterEval.lines?.[0];
@@ -710,7 +855,7 @@ function App() {
         };
         const row = { number: Math.floor(index / 2) + 1, ply: index + 1, color: played.color, san: played.san,
           uci: played.uci, fen: after, previousFen: before, eval: formatEvaluation(playedPosition || {}), lossCp,
-          beforeEvalText: formatEvaluation(best || {}), bestWhiteCp, label: classifyMove({ lossCp, thresholds: settings.classificationThresholds }), bestUci: coachInput.bestUci,
+          beforeEvalText: formatEvaluation(best || {}), bestWhiteCp, bestScore: { cp: best?.cp, mate: best?.mate }, label: classifyMove({ lossCp, thresholds: settings.classificationThresholds }), bestUci: coachInput.bestUci,
           bestSan, variations,
           opponentResponse, opponentSan: legalVariation(after, [opponentResponse], 1).san[0] || '—', pv: response?.pv || [],
           punishmentSan: punishmentVariations[0]?.san || [],
@@ -776,7 +921,7 @@ function App() {
   const selectedMark = darkEffective ? 'var(--yellow)' : 'var(--outline)';
   const hintMark = darkEffective ? 'var(--lime)' : 'var(--outline)';
   const checkMark = darkEffective ? 'var(--pink)' : 'var(--outline)';
-  const lastMove = settings.highlightLastMove ? timeline.moves[activePly - 1] : null;
+  const lastMove = settings.highlightLastMove ? visibleTimeline.moves[visiblePly - 1] : null;
   const checkedKingSquare = displayStatus.kind === 'check'
     ? displayChess.board().map((row, rank) => row.map((piece, file) => piece?.type === 'k' && piece.color === displaySideToMove ? `${'abcdefgh'[file]}${8 - rank}` : null).find(Boolean)).find(Boolean)
     : null;
@@ -797,7 +942,7 @@ function App() {
     }
   }
   const currentPositionHint = hints[displaySideToMove]?.fen === boardFen ? hints[displaySideToMove] : null;
-  const bestHintMove = settings.showBestMoveArrow ? currentPositionHint?.lines?.[0]?.pv?.[0] : null;
+  const bestHintMove = practiceSession?.phase === 'find' && practiceHintLevel >= 2 ? practiceSession.bestUci : settings.showBestMoveArrow ? currentPositionHint?.lines?.[0]?.pv?.[0] : null;
   if (bestHintMove) for (const square of [bestHintMove.slice(0, 2), bestHintMove.slice(2, 4)]) {
     highlights[square] = { backgroundColor: 'var(--lime)', boxShadow: `inset 0 0 0 ${markWidth}px ${hintMark}` };
   }
@@ -806,7 +951,7 @@ function App() {
   const boardDarkColors = { purple: 'var(--board-purple)', green: 'var(--board-green)', slate: 'var(--board-slate)' };
   const whiteOrientation = mode === 'local'
     ? (localSession?.options.orientation === 'auto' ? displaySideToMove === 'w' : !settings.flipBoard)
-    : (human === 'w') !== settings.flipBoard;
+    : ((practiceSession?.color || human) === 'w') !== settings.flipBoard;
 
   const options = {
     position: boardFen,
@@ -828,17 +973,16 @@ function App() {
 
   const boardArrows = [];
   if (settings.showBestMoveArrow && bestHintMove) boardArrows.push({ from: bestHintMove.slice(0, 2), to: bestHintMove.slice(2, 4), kind: 'best' });
-  if (settings.showOpponentThreats && selectedReviewRow?.opponentResponse) boardArrows.push({ from: selectedReviewRow.opponentResponse.slice(0, 2), to: selectedReviewRow.opponentResponse.slice(2, 4), kind: 'threat' });
-  if (settings.showTacticalArrows && selectedReviewRow?.opponentResponse) {
+  if (!practiceSession && settings.showOpponentThreats && selectedReviewRow?.opponentResponse) boardArrows.push({ from: selectedReviewRow.opponentResponse.slice(0, 2), to: selectedReviewRow.opponentResponse.slice(2, 4), kind: 'threat' });
+  if (!practiceSession && settings.showTacticalArrows && selectedReviewRow?.opponentResponse) {
     const arrow = { from: selectedReviewRow.opponentResponse.slice(0, 2), to: selectedReviewRow.opponentResponse.slice(2, 4), kind: 'tactical' };
     if (!boardArrows.some((current) => current.from === arrow.from && current.to === arrow.to)) boardArrows.push(arrow);
   }
-  if (practiceSession?.showBest && practiceSession.bestUci) {
-    boardArrows.unshift({ from: practiceSession.bestUci.slice(0, 2), to: practiceSession.bestUci.slice(2, 4), kind: 'best' });
-  }
+  if (practiceSession?.phase === 'find' && practiceHintLevel >= 2) boardArrows.unshift({ from: practiceSession.bestUci.slice(0, 2), to: practiceSession.bestUci.slice(2, 4), kind: 'best' });
+  if (!practiceSession && betterMoveRow?.bestUci) boardArrows.unshift({ from: betterMoveRow.bestUci.slice(0, 2), to: betterMoveRow.bestUci.slice(2, 4), kind: 'best' });
   return <DashboardLayout
     chess={chess} fen={boardFen} human={human} sideChoice={sideChoice} difficulty={difficulty} config={config}
-    engineState={engineState} engineError={engineError} thinking={thinking} hints={hints} promotion={promotion}
+    engineState={engineState} engineError={engineError} thinking={thinking || practiceBusy} hints={hints} promotion={promotion}
     notice={notice} resigned={resigned} pgn={pgn} setPgn={setPgn} reviewRows={reviewRows}
     reviewState={reviewState} reviewProgress={reviewProgress} status={isViewingHistory || practiceSession ? displayStatus : status} sideToMove={displaySideToMove}
     options={options} moveListRef={moveListRef} moves={moves} startGame={startGame} setDifficulty={setDifficulty}
@@ -855,9 +999,10 @@ function App() {
     clearSavedGame={() => { startGame(); try { localStorage.removeItem('chessflow-live.saved-game.v1'); } catch { /* storage may be unavailable */ } }}
     mode={mode} localSession={localSession} savedLocalGame={savedLocalGame} startLocalGame={startLocalGame}
     bestHintMove={bestHintMove} whiteOrientation={whiteOrientation}
-    timelineMoves={timeline.moves} currentPly={activePly} onNavigate={navigateToPly} replayPlaying={replayPlaying} onToggleReplay={toggleReplay} isViewingHistory={isViewingHistory}
-    selectedReviewRow={selectedReviewRow} coach={coach} onExplainMove={() => selectedReviewRow && explainMove(selectedReviewRow)} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPracticeMistake={startPractice} reviewGameInProgress={reviewGameInProgress}
+    timelineMoves={visibleTimeline.moves} currentPly={visiblePly} onNavigate={practiceSession ? () => {} : navigateToPly} replayPlaying={replayPlaying} onToggleReplay={toggleReplay} isViewingHistory={isViewingHistory}
+    selectedReviewRow={selectedReviewRow} coach={coach} onExplainMove={() => selectedReviewRow && explainMove(practiceSession ? { ...selectedReviewRow, coachInput: { ...selectedReviewRow.coachInput, practice: true } } : selectedReviewRow)} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPracticeMistake={startPractice} reviewGameInProgress={reviewGameInProgress}
     practiceSession={practiceSession} boardArrows={boardArrows}
+    practiceBusy={practiceBusy} practiceFeedback={practiceFeedback} practiceHintLevel={practiceHintLevel} practiceMovePending={practiceMovePending} onBackToReview={backToReview} onRetryPractice={retryPractice} onRevealPractice={revealPractice} onKeepPractice={keepPractice} onPracticeUndo={practiceUndo} onRestartPractice={restartPractice} onPracticeResign={practiceResign} onPreviousPracticeMistake={() => navigatePracticeMistake(-1)} onNextPracticeMistake={() => navigatePracticeMistake(1)}
     resumeLocalGame={resumeLocalGame} hintLoading={hintLoading} engineProgress={engineProgress} onCancelHint={() => { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setThinking(false); setNotice('Hint search canceled.'); }}
     localOutcome={localOutcome}
     onResignLocal={() => { const who = window.prompt('Who resigns? Enter White or Black.'); if (!who) return; const color = who.trim().toLowerCase() === 'white' ? 'w' : who.trim().toLowerCase() === 'black' ? 'b' : null; if (!color) { setNotice('Enter White or Black to resign.'); return; } const name = color === 'w' ? localSession?.options.whiteName : localSession?.options.blackName; if (window.confirm(`${name} resigns? Confirm to end the game.`)) { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setResigned(true); setResignedColor(color); setLocalOutcome('resign'); setNotice(`${name} resigned. ${color === 'w' ? localSession.options.blackName : localSession.options.whiteName} wins.`); } }}

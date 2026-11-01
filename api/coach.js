@@ -11,7 +11,7 @@ const UCI_TOKEN = /(?<![a-h][1-8])\b[a-h][1-8][a-h][1-8][qrbn]?\b(?![a-h][1-8])/
 const fields = new Set([
   'fen', 'previous_fen', 'move_san', 'move_uci', 'best_uci', 'evaluation_before', 'evaluation_after',
   'evaluation_loss', 'variations', 'punishment_variations', 'opponent_response', 'side_to_move',
-  'game_phase', 'motifs', 'user_level',
+  'game_phase', 'motifs', 'user_level', 'practice',
 ]);
 const lineFields = new Set(['uci', 'san', 'evaluation_cp_white', 'evaluation_mate_white', 'depth', 'nodes']);
 const explanationFields = [
@@ -90,6 +90,7 @@ function validateRequest(body) {
   }
   if (body.motifs !== undefined && (!Array.isArray(body.motifs) || body.motifs.length > 8 || body.motifs.some((motif) => typeof motif !== 'string' || motif.length > 50))) throw new Error('invalid_motifs');
   if (body.user_level !== undefined && !['beginner', 'intermediate', 'advanced', 'Easy', 'Medium', 'Hard', 'Max'].includes(body.user_level)) throw new Error('invalid_user_level');
+  if (body.practice !== undefined && typeof body.practice !== 'boolean') throw new Error('invalid_practice_context');
   return { body, allowedSans, bestSan, playedSan: played.san };
 }
 

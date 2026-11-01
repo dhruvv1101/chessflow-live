@@ -33,7 +33,7 @@ async function defaultAccessToken() {
 }
 
 export function coachCacheKey(review, engineVersion, analysisSettings) {
-  return JSON.stringify([review.fen, review.previousFen, review.moveUci, review.userLevel, engineVersion, analysisSettings]);
+  return JSON.stringify([review.fen, review.previousFen, review.moveUci, review.userLevel, review.practice === true, engineVersion, analysisSettings]);
 }
 
 export function getCachedCoachExplanation(key, storage = globalThis.localStorage) {
@@ -49,6 +49,7 @@ export function cacheCoachExplanation(key, explanation, storage = globalThis.loc
 }
 
 export async function analyzeCoachMove(review, { apiUrl = configuredApiUrl, fetchImpl = globalThis.fetch, signal, getAccessToken = defaultAccessToken } = {}) {
+  if (review.practice !== undefined && typeof review.practice !== 'boolean') throw new TypeError('Invalid practice context.');
   let token = null;
   try { token = await getAccessToken(); } catch { /* login is optional unless the server requires it */ }
   const headers = { 'Content-Type': 'application/json' };
@@ -65,6 +66,7 @@ export async function analyzeCoachMove(review, { apiUrl = configuredApiUrl, fetc
         punishment_variations: review.punishmentVariations,
         opponent_response: review.opponentResponse, side_to_move: review.sideToMove,
         game_phase: review.gamePhase, motifs: review.motifs || [], user_level: review.userLevel || 'intermediate',
+        ...(review.practice === true ? { practice: true } : {}),
       }),
     });
   } catch (error) {

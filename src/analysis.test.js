@@ -17,6 +17,13 @@ describe('move analysis timeline', () => {
     expect(() => buildTimeline(START, ['e5'])).toThrow(/move 1/i);
   });
 
+  it('keeps fullmove numbering from a custom start FEN in practice timelines', () => {
+    const timeline = buildTimeline('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 23', ['e4', 'e5']);
+    expect(timeline.moves.map(({ number, san, color }) => [number, color, san])).toEqual([[23, 'w', 'e4'], [23, 'b', 'e5']]);
+    const blackStarts = buildTimeline('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 23', ['e5', 'Nf3']);
+    expect(blackStarts.moves.map(({ number, color, san }) => [number, color, san])).toEqual([[23, 'b', 'e5'], [24, 'w', 'Nf3']]);
+  });
+
   it('uses configurable centipawn-loss thresholds and reserves book labels for known lines', () => {
     expect(classifyMove({ lossCp: 0 })).toBe('Best');
     expect(classifyMove({ lossCp: 25 })).toBe('Excellent');

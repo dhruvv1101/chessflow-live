@@ -1,4 +1,5 @@
 export const TRAINING_KEY = 'chessflow-live.training.v1';
+export const PRACTICE_KEY = 'chessflow-live.practice.v1';
 
 function read(storage) {
   try {
@@ -15,6 +16,27 @@ function gameId(text) {
 
 export function loadTrainingGames(storage = globalThis.localStorage) { return read(storage); }
 
+export function loadPracticeResults(storage = globalThis.localStorage) {
+  try {
+    const value = JSON.parse(storage?.getItem(PRACTICE_KEY) || '[]');
+    return Array.isArray(value) ? value.filter((row) => row && typeof row.gameKey === 'string' && Number.isInteger(row.ply)) : [];
+  } catch { return []; }
+}
+
+export function recordPracticeResult(result, storage = globalThis.localStorage, date = new Date().toISOString()) {
+  const row = {
+    gameKey: String(result.gameKey || 'unknown').slice(0, 120), ply: Math.max(0, Number(result.ply) || 0),
+    attempts: Math.max(0, Number(result.attempts) || 0), hintsUsed: Math.max(0, Number(result.hintsUsed) || 0),
+    foundBestFirstTry: Boolean(result.foundBestFirstTry), result: ['win', 'draw', 'loss'].includes(result.result) ? result.result : 'unknown', date,
+  };
+  try {
+    const saved = loadPracticeResults(storage).filter((entry) => !(entry.gameKey === row.gameKey && entry.ply === row.ply));
+    storage?.setItem(PRACTICE_KEY, JSON.stringify([row, ...saved].slice(0, 500)));
+    globalThis.dispatchEvent?.(new CustomEvent('chessflow:training-updated'));
+  } catch { /* Local practice stats are optional when browser storage is blocked. */ }
+  return row;
+}
+
 export function recordTrainingGame(rows, pgn, storage = globalThis.localStorage, date = new Date().toISOString()) {
   const id = gameId(`${pgn}\n${rows.map((row) => row.uci || row.san).join(' ')}`);
   const games = read(storage).filter((game) => game.id !== id);
@@ -23,7 +45,9 @@ export function recordTrainingGame(rows, pgn, storage = globalThis.localStorage,
   return saved;
 }
 
-export function summarizeTraining(games, now = Date.now()) {
+export function summarizeTraining(games, practicesOrNow = [], nowValue = Date.now()) {
+  const practices = Array.isArray(practicesOrNow) ? practicesOrNow : [];
+  const now = typeof practicesOrNow === 'number' ? practicesOrNow : nowValue;
   const rows = games.flatMap((game) => game.rows);
   const mistakes = rows.filter((row) => ['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label));
   const count = (label) => rows.filter((row) => row.label === label).length;
@@ -42,5 +66,7 @@ export function summarizeTraining(games, now = Date.now()) {
     verifiedTacticalClues: mistakes.filter((row) => row.motifs?.length).length,
     recentMistakes: recentRows.filter((row) => ['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label)).length,
     officialRating: null,
+    mistakesPracticed: practices.length,
+    foundBestMoveFirstTryPercent: practices.length ? Math.round(practices.filter((row) => row.foundBestFirstTry).length / practices.length * 100) : 0,
   };
 }

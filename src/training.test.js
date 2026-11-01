@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { loadTrainingGames, recordTrainingGame, summarizeTraining } from './training.js';
+import { loadTrainingGames, loadPracticeResults, recordPracticeResult, recordTrainingGame, summarizeTraining } from './training.js';
 
 const storage = () => {
   const values = new Map();
@@ -22,5 +22,13 @@ describe('local chess training history', () => {
     const local = storage();
     recordTrainingGame([{ label: 'Good', lossCp: 25 }], '1. e4', local, '2026-11-01T00:00:00.000Z');
     expect(loadTrainingGames(local)).toHaveLength(1);
+  });
+
+  it('records local practice outcomes and aggregates first-try success', () => {
+    const local = storage();
+    recordPracticeResult({ gameKey: 'game', ply: 4, attempts: 0, hintsUsed: 0, foundBestFirstTry: true, result: 'win' }, local, '2026-11-02T00:00:00.000Z');
+    recordPracticeResult({ gameKey: 'game', ply: 8, attempts: 2, hintsUsed: 1, foundBestFirstTry: false, result: 'draw' }, local, '2026-11-02T00:00:00.000Z');
+    expect(loadPracticeResults(local)).toHaveLength(2);
+    expect(summarizeTraining([], loadPracticeResults(local))).toMatchObject({ mistakesPracticed: 2, foundBestMoveFirstTryPercent: 50 });
   });
 });

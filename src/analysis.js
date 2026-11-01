@@ -10,6 +10,8 @@ export const DEFAULT_CLASSIFICATION_THRESHOLDS = Object.freeze({
 
 export function buildTimeline(initialFen, sans) {
   const game = new Chess(initialFen || undefined);
+  const initialMoveNumber = Number(game.fen().split(' ')[5]) || 1;
+  const startsBlack = game.turn() === 'b';
   const fens = [game.fen()];
   const moves = [];
   for (const [index, san] of sans.entries()) {
@@ -17,7 +19,8 @@ export function buildTimeline(initialFen, sans) {
     try { move = game.move(san); }
     catch { move = null; }
     if (!move) throw new Error(`Could not replay move ${index + 1}: ${san}`);
-    moves.push({ ply: index + 1, san: move.san, uci: `${move.from}${move.to}${move.promotion || ''}`,
+    const number = initialMoveNumber + Math.floor((index + (startsBlack ? 1 : 0)) / 2);
+    moves.push({ ply: index + 1, number, san: move.san, uci: `${move.from}${move.to}${move.promotion || ''}`,
       from: move.from, to: move.to, color: move.color, piece: move.piece, captured: move.captured || null,
       promotion: move.promotion || null });
     fens.push(game.fen());
