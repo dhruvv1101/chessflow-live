@@ -14,7 +14,7 @@ function makePiece(kind, color) {
   const dark = color === 'b';
   return function ChessFlowPiece({ svgStyle } = {}) {
     return <svg aria-hidden="true" viewBox="0 0 100 100" width="100%" height="100%" style={svgStyle}>
-      <g className={dark ? 'piece-dark-glyph' : 'piece-white-glyph'} fill={dark ? 'var(--piece-dark-fill)' : 'var(--piece-white-fill)'} stroke={dark ? 'var(--piece-dark-outline)' : '#000'} strokeWidth={dark ? 'var(--piece-dark-stroke-width)' : 5} strokeLinecap="round" strokeLinejoin="round">
+      <g className={dark ? 'piece-dark-glyph' : 'piece-white-glyph'} fill={dark ? 'var(--piece-dark-fill)' : 'var(--piece-white-fill)'} stroke={dark ? 'var(--piece-dark-outline)' : 'var(--piece-white-outline, #000)'} strokeWidth="var(--piece-stroke-width, 5px)" strokeLinecap="round" strokeLinejoin="round">
         {shapes[kind]}
       </g>
     </svg>;

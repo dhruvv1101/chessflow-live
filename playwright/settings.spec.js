@@ -15,10 +15,11 @@ test('theme settings persist, board stays playable, and layouts do not overflow'
   await expect(dialog).toBeVisible();
   await setSelect(dialog, 'Theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-effective-theme', 'light');
+  await expect(page.locator('html')).toHaveCSS('--border-width', '3px');
   await page.screenshot({ path: 'docs/screenshots/chessflow-light-390x844.png', fullPage: true });
   await setSelect(dialog, 'Theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-effective-theme', 'dark');
-  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(27, 24, 48)');
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(10, 10, 20)');
   await page.screenshot({ path: 'docs/screenshots/chessflow-dark-390x844.png', fullPage: true });
 
   await setSelect(dialog, 'Board colour', 'green');
@@ -68,6 +69,15 @@ test('theme settings persist, board stays playable, and layouts do not overflow'
   await page.locator('[data-square="e4"]').click();
   await expect(page.locator('.count-badge')).toHaveText('2 ply', { timeout: 30_000 });
   await expect(page.locator('#chessboard-piece-wP-e4')).toBeVisible();
+  const boardElement = await page.locator('.board-wrap').elementHandle();
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const themeSettings = page.getByRole('dialog', { name: 'Settings' });
+  await setSelect(themeSettings, 'Theme', 'light');
+  await expect(page.locator('#chessboard-piece-wP-e4')).toBeVisible();
+  await setSelect(themeSettings, 'Theme', 'dark');
+  const boardWasPreserved = await page.evaluate((element) => document.querySelector('.board-wrap') === element, boardElement);
+  expect(boardWasPreserved).toBe(true);
+  await themeSettings.getByRole('button', { name: 'Close settings' }).click();
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1280);
   expect(errors).toEqual([]);
 

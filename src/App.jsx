@@ -466,6 +466,11 @@ function App() {
     } finally { setThinking(false); setReviewProgress(''); }
   };
 
+  const darkEffective = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
+  const markWidth = darkEffective ? 2 : 4;
+  const selectedMark = darkEffective ? 'var(--yellow)' : 'var(--outline)';
+  const hintMark = darkEffective ? 'var(--lime)' : 'var(--outline)';
+  const checkMark = darkEffective ? 'var(--pink)' : 'var(--outline)';
   const lastMove = settings.highlightLastMove ? chess.history({ verbose: true }).at(-1) : null;
   const checkedKingSquare = status.kind === 'check'
     ? chess.board().map((row, rank) => row.map((piece, file) => piece?.type === 'k' && piece.color === sideToMove ? `${'abcdefgh'[file]}${8 - rank}` : null).find(Boolean)).find(Boolean)
@@ -475,22 +480,24 @@ function App() {
     highlights[lastMove.from] = { backgroundColor: 'var(--last-move)' };
     highlights[lastMove.to] = { backgroundColor: 'var(--last-move)' };
   }
-  if (selectedSquare) highlights[selectedSquare] = { backgroundColor: 'var(--yellow)', boxShadow: 'inset 0 0 0 4px var(--outline)' };
-  if (keyboardSquare) highlights[keyboardSquare] = { ...highlights[keyboardSquare], outline: '3px solid var(--outline)', outlineOffset: '-4px' };
+  if (selectedSquare) highlights[selectedSquare] = { backgroundColor: darkEffective ? 'rgb(255 196 0 / 18%)' : 'var(--yellow)', boxShadow: `inset 0 0 0 ${markWidth}px ${selectedMark}` };
+  if (keyboardSquare) highlights[keyboardSquare] = { ...highlights[keyboardSquare], outline: `${darkEffective ? 2 : 3}px solid ${darkEffective ? 'var(--yellow)' : 'var(--outline)'}`, outlineOffset: darkEffective ? '-3px' : '-4px' };
   if (selectedSquare && settings.showLegalDots) {
-    const dot = 'url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2210%22 fill=%22%23000%22/%3E%3C/svg%3E")';
     for (const move of chess.moves({ square: selectedSquare, verbose: true })) {
+      const lightSquare = (move.to.charCodeAt(0) - 97 + Number(move.to[1])) % 2 === 0;
+      const dotColor = darkEffective ? (lightSquare ? '%230A0A14' : '%23E9E7FF') : '%23000';
+      const opacity = darkEffective && lightSquare ? ' fill-opacity=%22.68%22' : '';
+      const dot = `url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ccircle cx=%2250%22 cy=%2250%22 r=%2210%22 fill=%22${dotColor}%22${opacity}/%3E%3C/svg%3E")`;
       highlights[move.to] = { backgroundImage: dot, backgroundPosition: 'center', backgroundRepeat: 'no-repeat', backgroundSize: '26% 26%' };
     }
   }
   const bestHintMove = hints[sideToMove]?.lines?.[0]?.pv?.[0];
   if (bestHintMove) for (const square of [bestHintMove.slice(0, 2), bestHintMove.slice(2, 4)]) {
-    highlights[square] = { backgroundColor: 'var(--lime)', boxShadow: 'inset 0 0 0 4px var(--outline)' };
+    highlights[square] = { backgroundColor: 'var(--lime)', boxShadow: `inset 0 0 0 ${markWidth}px ${hintMark}` };
   }
-  if (checkedKingSquare) highlights[checkedKingSquare] = { backgroundColor: 'var(--pink)', boxShadow: 'inset 0 0 0 4px var(--outline)' };
+  if (checkedKingSquare) highlights[checkedKingSquare] = { backgroundColor: 'var(--pink)', boxShadow: `inset 0 0 0 ${markWidth}px ${checkMark}` };
 
   const boardDarkColors = { purple: 'var(--board-purple)', green: 'var(--board-green)', slate: 'var(--board-slate)' };
-  const darkEffective = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
   const whiteOrientation = mode === 'local'
     ? (localSession?.options.orientation === 'auto' ? sideToMove === 'w' : !settings.flipBoard)
     : (human === 'w') !== settings.flipBoard;
@@ -510,7 +517,7 @@ function App() {
     darkSquareNotationStyle: { color: darkEffective ? '#FBF8F2' : '#000' },
     alphaNotationStyle: { fontWeight: 800 },
     numericNotationStyle: { fontWeight: 800 },
-    boardStyle: { borderRadius: '12px', overflow: 'hidden' },
+    boardStyle: { borderRadius: 'var(--board-radius, 12px)', overflow: 'hidden' },
   };
 
   return <DashboardLayout
