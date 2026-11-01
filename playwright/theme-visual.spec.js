@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js';
 
-const output = 'docs/screenshots';
+const output = 'test-results';
 const views = [
   { name: '390x844', width: 390, height: 844 },
   { name: '1280x800', width: 1280, height: 800 },
@@ -11,7 +11,7 @@ const analysisResponse = {
 };
 
 async function screenshot(page, theme, view, state) {
-  await page.screenshot({ path: `${output}/${theme}-${state}-${view.name}.png`, animations: 'disabled' });
+  await page.screenshot({ path: `${output}/theme-visual-${theme}-${state}-${view.name}.png`, animations: 'disabled' });
 }
 
 async function chooseTheme(page, theme) {

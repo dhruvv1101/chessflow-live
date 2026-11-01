@@ -3,12 +3,11 @@ import { Chess } from 'chess.js';
 
 export const test = base.extend({
   page: async ({ page }, use) => {
-    // Keep unrelated UI tests hermetic while the browser engine is the fallback.
-    // Engine-routing tests install a later, more specific server response.
-    await page.route('http://localhost:8090/health', (route) => route.fulfill({
-      json: { ok: true, engine: 'Stockfish test double', threads: 1, hash_mb: 16 },
+    // Default browser tests never depend on the configured engine host or a running container.
+    await page.route('**/health', (route) => route.fulfill({
+      json: { ok: false, engine: 'Stockfish test double', threads: 1, hash_mb: 16 },
     }));
-    await page.route('http://localhost:8090/analyze', async (route) => {
+    await page.route('**/analyze', async (route) => {
       const { fen } = route.request().postDataJSON();
       const board = new Chess(fen);
       const lines = board.moves({ verbose: true }).slice(0, 3).map((move, index) => {
@@ -20,6 +19,14 @@ export const test = base.extend({
         time_ms: 10, lines,
       } });
     });
+    await page.route('**/api/coach', (route) => route.fulfill({ status: 200, json: {
+      provider: 'stockfish', model: null, fallback: true, flags: ['test_fixture'],
+      explanation: { what_happened: 'Stockfish test evidence.', why_bad: '', opponent_punishment: '', position_deterioration: '', punishment_line: [], tactical_idea: '', winning_plan: '', lesson: '', elo_tip: '' },
+    } }));
+    await page.route('**/api/coach/analyze', (route) => route.fulfill({ status: 200, json: {
+      provider: 'stockfish', model: null, fallback: true, flags: ['test_fixture'],
+      explanation: { what_happened: 'Stockfish test evidence.', why_bad: '', opponent_punishment: '', position_deterioration: '', punishment_line: [], tactical_idea: '', winning_plan: '', lesson: '', elo_tip: '' },
+    } }));
     await use(page);
   },
 });

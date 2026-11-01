@@ -16,11 +16,11 @@ test('theme settings persist, board stays playable, and layouts do not overflow'
   await setSelect(dialog, 'Theme', 'light');
   await expect(page.locator('html')).toHaveAttribute('data-effective-theme', 'light');
   await expect(page.locator('html')).toHaveCSS('--border-width', '3px');
-  await page.screenshot({ path: 'docs/screenshots/chessflow-light-390x844.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/chessflow-light-390x844.png', fullPage: true });
   await setSelect(dialog, 'Theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-effective-theme', 'dark');
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(10, 10, 20)');
-  await page.screenshot({ path: 'docs/screenshots/chessflow-dark-390x844.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/chessflow-dark-390x844.png', fullPage: true });
 
   await setSelect(dialog, 'Board colour', 'green');
   await setSelect(dialog, 'Board colour', 'slate');
@@ -46,10 +46,10 @@ test('theme settings persist, board stays playable, and layouts do not overflow'
   await page.getByRole('button', { name: 'Settings' }).click();
   const desktopDialog = page.getByRole('dialog', { name: 'Settings' });
   await setSelect(desktopDialog, 'Theme', 'light');
-  await page.screenshot({ path: 'docs/screenshots/chessflow-light-1280x800.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/chessflow-light-1280x800.png', fullPage: true });
   await setSelect(desktopDialog, 'Theme', 'dark');
   await expect(page.locator('html')).toHaveAttribute('data-effective-theme', 'dark');
-  await page.screenshot({ path: 'docs/screenshots/chessflow-dark-1280x800.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/chessflow-dark-1280x800.png', fullPage: true });
   await desktopDialog.getByRole('button', { name: 'Close settings' }).click();
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 1280);
   await expect(page.locator('.board-wrap')).toBeVisible();

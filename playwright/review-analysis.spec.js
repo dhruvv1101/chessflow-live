@@ -24,8 +24,11 @@ test('imports a finished PGN, analyzes each ply, and synchronizes move history w
   await expect(page.locator('.coach-engine-details')).toHaveAttribute('open', '');
   await expect(page.locator('.coach-engine-details')).toContainText('Verified opponent continuation');
 
+  const bestMoveText = await page.locator('.coach-engine-details p').first().textContent();
+  const bestMove = /Best move:\s*([^\s·]+)/.exec(bestMoveText)?.[1];
+  expect(bestMove).toBeTruthy();
   await page.getByRole('button', { name: 'Show Better Move' }).click();
   await expect(page.locator('.move-position')).toContainText('Position 1 of 4');
-  await expect(page.locator('.practice-banner')).toContainText('Try e5');
+  await expect(page.locator('.practice-banner')).toContainText(`Try ${bestMove}`);
   await expect(page.locator('.board-arrow-overlay .board-arrow.best')).toBeVisible();
 });

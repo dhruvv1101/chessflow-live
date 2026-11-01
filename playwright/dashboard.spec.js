@@ -20,12 +20,12 @@ test('dashboard adapts to phone and desktop widths', async ({ page }) => {
   await expect(page.locator('.board-wrap')).toBeVisible();
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
   expect(await page.locator('.hero h1 span').nth(1).evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(390);
-  await page.screenshot({ path: 'docs/screenshots/chessflow-phone-390x844.png' });
+  await page.screenshot({ path: 'test-results/chessflow-phone-390x844.png' });
 
   await page.setViewportSize({ width: 1280, height: 800 });
   await expect(page.locator('.game-layout')).toBeVisible();
   await expect(page.locator('.side-grid')).toBeVisible();
-  await page.screenshot({ path: 'docs/screenshots/chessflow-desktop-1280x800.png' });
+  await page.screenshot({ path: 'test-results/chessflow-desktop-1280x800.png' });
 
   await page.getByRole('button', { name: 'White' }).click();
   await page.locator('[data-square="e2"]').click();

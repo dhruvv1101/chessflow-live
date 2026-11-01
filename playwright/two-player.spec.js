@@ -22,17 +22,17 @@ test('two-player pass-and-play, both-side hints, auto flip and persistence', asy
   await page.getByLabel('White name').fill('  Asha  ');
   await page.getByLabel('Black name').fill('Rohan');
   await page.getByLabel('Two-player setup orientation').selectOption('auto');
-  await page.screenshot({ path: 'docs/screenshots/two-player-setup-light-390x844.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/two-player-setup-light-390x844.png', fullPage: true });
   await setTheme(page, 'dark');
   await page.setViewportSize({ width: 1280, height: 800 });
-  await page.screenshot({ path: 'docs/screenshots/two-player-setup-dark-1280x800.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/two-player-setup-dark-1280x800.png', fullPage: true });
 
   await page.getByRole('button', { name: 'Start two-player game' }).click();
   await expect(page.locator('.turn-chip')).toContainText('Asha to move (White)');
-  await page.screenshot({ path: 'docs/screenshots/two-player-game-dark-1280x800.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/two-player-game-dark-1280x800.png', fullPage: true });
   await setTheme(page, 'light');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.screenshot({ path: 'docs/screenshots/two-player-game-light-390x844.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/two-player-game-light-390x844.png', fullPage: true });
 
   await playMove(page, 'e2', 'e4');
   await expect(page.locator('.turn-chip')).toContainText('Rohan to move (Black)');

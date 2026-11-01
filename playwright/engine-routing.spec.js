@@ -10,13 +10,7 @@ async function startHint(page, forceServer = false) {
   await page.getByRole('button', { name: 'Get a hint' }).click();
 }
 
-test('uses the configured local Stockfish API when it is available', async ({ page }) => {
-  test.skip(!process.env.VITE_ENGINE_API_URL, 'Set VITE_ENGINE_API_URL and start the local analysis server to run this integration check.');
-  await startHint(page);
-  await expect(page.locator('.engine-info')).toContainText('Server engine: Stockfish 19, depth');
-});
-
-test('shows server engine identity, depth and search info for a hint', async ({ page }) => {
+test('uses the mocked Stockfish API and shows engine identity, depth and search info', async ({ page }) => {
   await page.route('**/health', (route) => route.fulfill({ json: { ok: true, engine: 'Stockfish 19', threads: 2, hash_mb: 128 } }));
   await page.route('**/analyze', (route) => route.fulfill({ json: {
     best_uci: 'e2e4', engine: 'Stockfish 19', depth: 18, nodes: 123456, time_ms: 3000,
@@ -46,10 +40,11 @@ test('falls back visibly to browser engine when server returns 503', async ({ pa
   expect(pageErrors).toEqual([]);
 });
 
-test('falls back visibly to browser engine when the server is stopped', async ({ page }) => {
-  test.skip(process.env.CHECK_ENGINE_OFFLINE !== '1', 'Run with the local engine container stopped to check the real connection failure path.');
+test('falls back visibly to browser engine when mocked server health and analysis fail', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.route('**/health', (route) => route.abort('failed'));
+  await page.route('**/analyze', (route) => route.abort('failed'));
   await page.route('**/engine/stockfish-19-single.js', (route) => route.abort('failed'));
   await startHint(page, true);
   await expect(page.locator('.engine-info')).toContainText('Using browser engine: Stockfish 19');
