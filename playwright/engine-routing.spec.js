@@ -33,3 +33,14 @@ test('falls back visibly to browser engine when server returns 503', async ({ pa
   await expect(page.locator('.engine-info')).toContainText('Lite single-thread');
   expect(pageErrors).toEqual([]);
 });
+
+test('falls back visibly to browser engine when the server is stopped', async ({ page }) => {
+  test.skip(process.env.CHECK_ENGINE_OFFLINE !== '1', 'Run with the local engine container stopped to check the real connection failure path.');
+  const pageErrors = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.route('**/engine/stockfish-19-single.js', (route) => route.abort('failed'));
+  await startHint(page);
+  await expect(page.locator('.engine-info')).toContainText('Using browser engine: Stockfish 19');
+  await expect(page.locator('.engine-info')).toContainText('Lite single-thread');
+  expect(pageErrors).toEqual([]);
+});
