@@ -9,3 +9,8 @@ playwright-report/
 !.env.example
 public/engine/stockfish-19*.js
 public/engine/stockfish-19*.wasm
+
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
