@@ -16,3 +16,15 @@ The service honors `PORT` when present (otherwise 8080), requires an explicit `A
 Deployment configuration and exact commands are in [DEPLOY.md](DEPLOY.md). Fly secrets keep `ALLOWED_ORIGINS` out of the config file. The Render Blueprint prompts for its `ALLOWED_ORIGINS` secret.
 
 The GitHub workflow at `.github/workflows/server-ci.yml` runs pytest and builds the Docker image on pushes and pull requests. It does not publish or deploy the image.
+
+## Optional Gemini explanations
+
+The same FastAPI app exposes `POST /api/coach/analyze`. It accepts the played move, before/after FENs, White-perspective evaluations, and SAN/UCI variations from Stockfish; it validates each line with python-chess before making a request. The server returns a 503 when `GEMINI_API_KEY` is not set, so move analysis and browser hints keep working without Gemini. Keep `GEMINI_API_KEY` in the server process/container environment only. `GEMINI_MODEL` optionally selects a Gemini model; the default is `gemini-3.5-flash-lite`. Do not add either setting to Vite or client code.
+
+For a local Docker run, pass the server-only environment variable to Docker from your PowerShell session after setting it securely in that session:
+
+```powershell
+docker run --rm -p 8090:8080 -e ALLOWED_ORIGINS=http://localhost:5173 -e GEMINI_API_KEY chessflow-engine:latest
+```
+
+The panel automatically requests an explanation for the currently selected inaccuracy, mistake, or blunder when the configured server is available. Explanations are cached locally by position, move, Stockfish version, and search settings. No key is bundled into the browser. The coach route sends the supplied position and engine evidence to Google's Gemini API only when an explanation is requested; without that server-side configuration, Stockfish evidence remains available.

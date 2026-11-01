@@ -414,6 +414,70 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
   .button:hover:not(:disabled), .option-button:hover:not(:disabled), .button:active:not(:disabled), .option-button:active:not(:disabled) { transform: none !important; box-shadow: var(--hard-shadow) !important; }
 }
 
+/* Move review and coaching tools */
+.move-navigation { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin: 16px 0 10px; }
+.move-navigation .button { min-height: 40px; padding: 7px 9px; }
+.move-indicator { grid-column: 1 / -1; color: var(--muted); text-align: center; font-size: .85rem; font-variant-numeric: tabular-nums; }
+.move-history { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 0; padding: 0; list-style: none; }
+.move-history li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.history-number { min-width: 30px; color: var(--muted); font-size: .78rem; text-align: right; }
+.history-move { flex: 1; min-width: 0; padding: 8px; border: var(--line); border-radius: 10px; background: var(--cream); color: var(--ink); font-weight: 700; cursor: pointer; }
+.history-move.is-current { outline: 2px solid var(--purple); outline-offset: 1px; }
+.history-mark { margin-left: 4px; }
+.review-graph-card { grid-column: 1 / -1; }
+.graph-zero { stroke: var(--muted); stroke-dasharray: 5 5; opacity: .75; }
+.graph-cursor { stroke: var(--pink); stroke-width: 2; stroke-dasharray: 4 3; }
+.graph-point { cursor: pointer; }
+.graph-point:focus-visible { outline: none; }
+.graph-point:focus-visible circle { stroke: var(--yellow); stroke-width: 4; }
+.coach-panel, .opening-analysis, .training-panel { min-width: 0; }
+.coach-panel { grid-column: 1 / -1; }
+.coach-panel .folder-head { align-items: flex-start; }
+.analysis-classification { margin-left: auto; padding: 5px 10px; border-radius: 999px; background: var(--lime); color: #152006; font-size: .78rem; font-weight: 800; }
+.analysis-classification-inaccuracy { background: var(--yellow); }
+.analysis-classification-mistake { background: var(--peach); }
+.analysis-classification-blunder { background: var(--pink); color: #fff; }
+.coach-summary { color: var(--muted); }
+.coach-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.coach-explanation { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.coach-explanation section { padding: 12px; border: var(--line); border-radius: 12px; }
+.coach-explanation h3 { margin: 0 0 6px; font-size: .95rem; }
+.coach-explanation p { margin: 0; }
+.verified-line { margin-top: 8px !important; font-family: ui-monospace, monospace; }
+.coach-engine-details { margin-top: 14px; padding: 12px; border: var(--line); border-radius: 12px; }
+.coach-engine-details summary { cursor: pointer; font-weight: 700; }
+.coach-engine-details li { margin: 6px 0; }
+.coach-fallback { color: var(--amber); }
+.board-arrow-overlay { position: absolute; inset: 0; z-index: 4; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.board-arrow line { stroke-width: 12; stroke-linecap: round; opacity: .8; }
+.board-arrow circle { fill: none; stroke-width: 7; opacity: .82; }
+.board-arrow.best line, .board-arrow.best circle { stroke: var(--lime); }
+.board-arrow.threat line, .board-arrow.threat circle { stroke: var(--pink); }
+.board-arrow.tactical line, .board-arrow.tactical circle { stroke: var(--yellow); }
+.practice-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; border: var(--line); border-radius: 14px; background: var(--cream); }
+.practice-banner .button { margin-left: auto; }
+.opening-moves { display: flex; flex-wrap: wrap; gap: 6px; }
+.opening-moves span { padding: 4px 7px; border: var(--line); border-radius: 8px; }
+.training-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 8px; }
+.training-stat { padding: 10px; border: var(--line); border-radius: 12px; }
+.training-stat strong { display: block; font-size: 1.2rem; }
+:root[data-effective-theme="dark"] .move-history .history-move,
+:root[data-effective-theme="dark"] .practice-banner { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); color: var(--text); }
+:root[data-effective-theme="dark"] .history-move.is-current { outline: 2px solid var(--yellow); }
+:root[data-effective-theme="dark"] .coach-explanation section,
+:root[data-effective-theme="dark"] .coach-engine-details,
+:root[data-effective-theme="dark"] .training-stat,
+:root[data-effective-theme="dark"] .opening-moves span { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+:root[data-effective-theme="dark"] .analysis-classification { color: #152006; }
+:root[data-effective-theme="dark"] .analysis-classification-blunder { color: #fff; }
+@media (max-width: 560px) {
+  .move-navigation { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .move-navigation .move-indicator { grid-column: 1 / -1; grid-row: 1; }
+  .coach-explanation { grid-template-columns: 1fr; }
+  .coach-actions .button { flex: 1 1 45%; }
+  .practice-banner .button { margin-left: 0; }
+}
+
 :root[data-reduce-motion="true"] *,
 :root[data-reduce-motion="true"] *::before,
 :root[data-reduce-motion="true"] *::after {

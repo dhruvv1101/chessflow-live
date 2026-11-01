@@ -58,6 +58,14 @@ npm run engine:stop
 
 `engine:start` uses the local image `chessflow-engine:latest`, maps `8090:8080`, names the container `chessflow-engine`, and sets `ALLOWED_ORIGINS=http://localhost:5173`. `engine:check` prints engine name, thread count, hash size, and health response time, or says `Engine server not running`. For local Vite testing, use `VITE_ENGINE_API_URL=http://localhost:8090`.
 
+## Move review and optional chess coach
+
+After pasting a finished PGN, ChessFlow reconstructs every ply from the initial FEN and evaluates the position before and after each move with the Stockfish 19 Full browser build. Move-history buttons, first/previous/next/last controls, arrow keys, Space replay, and graph points select a historical position without changing the game record. Centipawn-loss labels use configurable thresholds in Settings; opening-book labels and tactical-pattern claims are omitted when no database or verified detector is available.
+
+Inaccuracies, mistakes, and blunders show Stockfish lines automatically. If the optional server has `GEMINI_API_KEY` configured server-side, the selected move can also receive a beginner-friendly explanation from `POST /api/coach/analyze`; the browser never receives that key. The request sends FENs, move notation, scores, and Stockfish lines to the configured server, which validates the moves before calling Gemini. The local `engine:start` script forwards `GEMINI_API_KEY` from the terminal environment if present. Without a configured server or model access, the Stockfish analysis still works. To enable a local server, follow [server/README.md](server/README.md) and set `VITE_ENGINE_API_URL` in your local Vite environment. No Gemini key is required for the core application.
+
+Move review summaries are stored in this browser's local storage and are not official rating data. Opening names, personalized pattern detection, and online training synchronization require data sources or services that are not configured.
+
 ## Engine and licensing
 
 This project is licensed under GPL-3.0; see [LICENSE](LICENSE). Stockfish's upstream source is [github.com/nmrugg/stockfish.js](https://github.com/nmrugg/stockfish.js), with the upstream Stockfish engine at [github.com/official-stockfish/Stockfish](https://github.com/official-stockfish/Stockfish). The included engine files are from pinned npm package `stockfish@19.0.1`, build `stockfish-19-lite-single`. Its full license is included in [NOTICE-STOCKFISH-LICENSE.txt](NOTICE-STOCKFISH-LICENSE.txt).

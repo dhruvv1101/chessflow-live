@@ -38,6 +38,9 @@ export default function SettingsPanel({ settings, onChange, onReset, onClearSave
         {checkbox('highlightLastMove', 'Highlight last move')}
         {checkbox('flipBoard', 'Flip board (Black at bottom)')}
         {checkbox('showCoordinates', 'Show coordinates')}
+        {checkbox('showBestMoveArrow', 'Show best-move arrow')}
+        {checkbox('showOpponentThreats', 'Show opponent response arrow')}
+        {checkbox('showTacticalArrows', 'Show verified variation arrows')}
       </section>
 
       <section className="settings-section" aria-labelledby="pass-play-settings-title">
@@ -53,6 +56,11 @@ export default function SettingsPanel({ settings, onChange, onReset, onClearSave
         <label className="setting-select">Hint engine<select aria-label="Hint engine" value={settings.hintEngine} onChange={(event) => onChange({ hintEngine: event.target.value })}><option value="auto">Auto</option><option value="server">Server</option><option value="browser">Browser</option></select></label>
         <label className="setting-select">Hint time<select aria-label="Hint time" value={settings.hintTime} onChange={(event) => onChange({ hintTime: Number(event.target.value) })}><option value="2000">2 seconds</option><option value="4000">4 seconds</option><option value="6000">6 seconds</option></select></label>
         <label className="setting-select">Default difficulty<select aria-label="Default difficulty" value={settings.defaultDifficulty} onChange={(event) => onChange({ defaultDifficulty: event.target.value })}><option>Easy</option><option>Medium</option><option>Hard</option><option>Max</option></select></label>
+      </section>
+
+      <section className="settings-section" aria-labelledby="review-thresholds-title">
+        <h3 id="review-thresholds-title">Move review thresholds (centipawns)</h3>
+        {Object.entries(settings.classificationThresholds).map(([key, value]) => <label className="setting-select" key={key}>{key[0].toUpperCase() + key.slice(1)} loss or less<input aria-label={`${key} loss threshold`} type="number" min="0" max="2000" step="5" value={value} onChange={(event) => onChange({ classificationThresholds: { ...settings.classificationThresholds, [key]: Number(event.target.value) } })}/></label>)}
       </section>
 
       <section className="settings-section settings-data" aria-labelledby="data-settings-title">

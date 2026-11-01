@@ -134,6 +134,76 @@ def test_response_has_white_score_san_and_ten_ply_fields(client):
     assert response.json()["nodes"] == 123456
 
 
+def test_coach_requires_server_side_api_key(client, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    response = client[0].post("/api/coach/analyze", json={
+        "previous_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "move_san": "e4", "move_uci": "e2e4", "best_uci": "e2e4",
+        "evaluation_before": 20, "evaluation_after": 18, "evaluation_loss": 2,
+        "variations": [{"uci": ["e2e4", "e7e5"], "san": ["e4", "e5"]}],
+        "punishment_variations": [{"uci": ["e7e5", "g1f3"], "san": ["e5", "Nf3"]}],
+        "opponent_response": "e7e5", "side_to_move": "w", "game_phase": "opening", "motifs": [],
+    })
+    assert response.status_code == 503
+    assert "not configured" in response.json()["detail"]
+
+
+def test_coach_rejects_an_illegal_or_mismatched_move(client, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only")
+    response = client[0].post("/api/coach/analyze", json={
+        "previous_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "move_san": "e4", "move_uci": "e2e5", "best_uci": "e2e4",
+        "evaluation_before": 20, "evaluation_after": 18, "evaluation_loss": 2,
+        "variations": [{"uci": ["e2e4"], "san": ["e4"]}], "punishment_variations": [{"uci": ["e7e5"], "san": ["e5"]}],
+        "opponent_response": "", "side_to_move": "w", "game_phase": "opening", "motifs": [],
+    })
+    assert response.status_code == 400
+    assert "move" in response.json()["detail"]
+
+
+def test_coach_discards_model_moves_outside_validated_stockfish_lines(monkeypatch):
+    import asyncio
+    import json
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only")
+    generated = {
+        "what_happened": "Qh5 is a better move than e4.", "why_bad": "The move gave up time.",
+        "opponent_punishment": "e5 develops a piece.", "position_deterioration": "The line stays balanced.",
+        "tactical_idea": "No tactic is established.", "winning_plan": "Develop pieces.",
+        "lesson": "Develop before attacking.", "elo_tip": "Review candidate moves.", "punishment_line_index": 0,
+    }
+    response_body = {"candidates": [{"content": {"parts": [{"text": json.dumps(generated)}]}}]}
+
+    class FakeResponse:
+        status_code = 200
+        def raise_for_status(self): pass
+        def json(self): return response_body
+
+    class FakeAsyncClient:
+        def __init__(self, **_kwargs): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *_args): pass
+        async def post(self, _url, *, headers, json):
+            assert headers["x-goog-api-key"] == "test-only"
+            assert json["generationConfig"]["responseFormat"]["text"]["mimeType"] == "application/json"
+            return FakeResponse()
+
+    monkeypatch.setattr(api.httpx, "AsyncClient", FakeAsyncClient)
+    payload = api.CoachRequest.model_validate({
+        "previous_fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+        "fen": "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+        "move_san": "e4", "move_uci": "e2e4", "best_uci": "e2e4", "evaluation_loss": 0,
+        "variations": [{"uci": ["e2e4", "e7e5"], "san": ["e4", "e5"]}],
+        "punishment_variations": [{"uci": ["e7e5", "g1f3"], "san": ["e5", "Nf3"]}],
+        "opponent_response": "e7e5", "side_to_move": "w", "game_phase": "opening",
+    })
+    result = asyncio.run(api.coach_analyze(payload))
+    assert "unverified move omitted" in result["explanation"]["what_happened"]
+    assert result["explanation"]["punishment_line"] == ["e5", "Nf3"]
+
+
 @pytest.mark.skipif(not Path(os.getenv("STOCKFISH_PATH", "/usr/local/bin/stockfish")).exists() and not os.getenv("STOCKFISH_API_URL"), reason="Set STOCKFISH_PATH or STOCKFISH_API_URL to run the real-engine test")
 def test_real_stockfish_finds_back_rank_mate(monkeypatch):
     payload = {"fen": FEN, "movetime_ms": 1000, "multipv": 1, "skill": 20}

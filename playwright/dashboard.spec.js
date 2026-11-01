@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 test('dashboard adapts to phone and desktop widths', async ({ page }) => {
   await page.route('**/health', (route) => route.fulfill({ json: { ok: true, engine: 'Stockfish 19', threads: 2, hash_mb: 128 } }));
@@ -43,6 +43,7 @@ test('dashboard adapts to phone and desktop widths', async ({ page }) => {
 
 test('pieces retain consistent rendered styles after e2-e4 and the AI reply', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await page.getByRole('button', { name: 'White' }).click();
   const source = page.locator('#chessboard-piece-wP-e2');

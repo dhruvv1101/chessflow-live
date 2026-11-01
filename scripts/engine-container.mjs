@@ -43,7 +43,7 @@ try {
       if (existing.stdout.trim() === 'true') console.log(`Container ${name} is already running.`);
       else dockerChecked(['start', name]);
     } else {
-      dockerChecked(['run', '--detach', '--rm', '--name', name, '--publish', '8090:8080', '--env', 'ALLOWED_ORIGINS=http://localhost:5173', image]);
+      dockerChecked(['run', '--detach', '--rm', '--name', name, '--publish', '8090:8080', '--env', 'ALLOWED_ORIGINS=http://localhost:5173', '--env', 'GEMINI_API_KEY', image]);
     }
     await waitForHealth();
   } else if (action === 'stop') {

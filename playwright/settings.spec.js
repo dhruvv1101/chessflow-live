@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures.js';
 
 async function setSelect(dialog, label, value) {
   await dialog.getByLabel(label).selectOption(value);

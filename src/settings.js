@@ -9,12 +9,16 @@ export const DEFAULT_SETTINGS = Object.freeze({
   highlightLastMove: true,
   flipBoard: false,
   showCoordinates: true,
+  showBestMoveArrow: true,
+  showOpponentThreats: false,
+  showTacticalArrows: false,
   hintTime: 4000,
   engineChoice: 'standard',
   hintEngine: 'auto',
   defaultDifficulty: 'Medium',
   localOrientation: 'fixed',
   localHintsAllowed: true,
+  classificationThresholds: Object.freeze({ best: 10, excellent: 30, good: 60, inaccuracy: 100, mistake: 200 }),
 });
 
 const themeValues = new Set(['system', 'light', 'dark']);
@@ -30,6 +34,15 @@ function getStorage() {
 
 export function validateSettings(input = {}) {
   const source = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+  const thresholdInput = source.classificationThresholds && typeof source.classificationThresholds === 'object' ? source.classificationThresholds : {};
+  const thresholds = {};
+  let previous = 0;
+  for (const key of ['best', 'excellent', 'good', 'inaccuracy', 'mistake']) {
+    const configured = Number(thresholdInput[key]);
+    const fallback = DEFAULT_SETTINGS.classificationThresholds[key];
+    thresholds[key] = Math.max(previous, Math.min(2000, Number.isFinite(configured) ? configured : fallback));
+    previous = thresholds[key];
+  }
   return {
     theme: themeValues.has(source.theme) ? source.theme : DEFAULT_SETTINGS.theme,
     boardColor: boardValues.has(source.boardColor) ? source.boardColor : DEFAULT_SETTINGS.boardColor,
@@ -38,12 +51,16 @@ export function validateSettings(input = {}) {
     highlightLastMove: typeof source.highlightLastMove === 'boolean' ? source.highlightLastMove : DEFAULT_SETTINGS.highlightLastMove,
     flipBoard: typeof source.flipBoard === 'boolean' ? source.flipBoard : DEFAULT_SETTINGS.flipBoard,
     showCoordinates: typeof source.showCoordinates === 'boolean' ? source.showCoordinates : DEFAULT_SETTINGS.showCoordinates,
+    showBestMoveArrow: typeof source.showBestMoveArrow === 'boolean' ? source.showBestMoveArrow : DEFAULT_SETTINGS.showBestMoveArrow,
+    showOpponentThreats: typeof source.showOpponentThreats === 'boolean' ? source.showOpponentThreats : DEFAULT_SETTINGS.showOpponentThreats,
+    showTacticalArrows: typeof source.showTacticalArrows === 'boolean' ? source.showTacticalArrows : DEFAULT_SETTINGS.showTacticalArrows,
     hintTime: hintTimes.has(source.hintTime) ? source.hintTime : DEFAULT_SETTINGS.hintTime,
     engineChoice: engineChoices.has(source.engineChoice) ? source.engineChoice : DEFAULT_SETTINGS.engineChoice,
     hintEngine: hintEngines.has(source.hintEngine) ? source.hintEngine : DEFAULT_SETTINGS.hintEngine,
     defaultDifficulty: difficulties.has(source.defaultDifficulty) ? source.defaultDifficulty : DEFAULT_SETTINGS.defaultDifficulty,
     localOrientation: source.localOrientation === 'auto' ? 'auto' : 'fixed',
     localHintsAllowed: typeof source.localHintsAllowed === 'boolean' ? source.localHintsAllowed : DEFAULT_SETTINGS.localHintsAllowed,
+    classificationThresholds: thresholds,
   };
 }
 
