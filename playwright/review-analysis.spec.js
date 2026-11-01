@@ -18,4 +18,14 @@ test('imports a finished PGN, analyzes each ply, and synchronizes move history w
   await expect(page.locator('.coach-panel')).toContainText('e5');
   await expect(page.locator('.graph-cursor')).toHaveCount(1);
   await expect(page.locator('.count-badge')).toHaveText('4 ply');
+
+  await page.getByRole('button', { name: /Show Opponent.s Plan/ }).click();
+  await expect(page.locator('.hero-status')).toContainText("Stockfish's top reply after e5 is");
+  await expect(page.locator('.coach-engine-details')).toHaveAttribute('open', '');
+  await expect(page.locator('.coach-engine-details')).toContainText('Verified opponent continuation');
+
+  await page.getByRole('button', { name: 'Show Better Move' }).click();
+  await expect(page.locator('.move-position')).toContainText('Position 1 of 4');
+  await expect(page.locator('.practice-banner')).toContainText('Try e5');
+  await expect(page.locator('.board-arrow-overlay .board-arrow.best')).toBeVisible();
 });

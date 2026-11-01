@@ -375,7 +375,7 @@ async def coach_analyze(params: CoachRequest):
     endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseFormat": {"text": {"mimeType": "application/json", "schema": COACH_OUTPUT_SCHEMA}}, "maxOutputTokens": 900},
+        "generationConfig": {"responseFormat": {"text": {"mimeType": "APPLICATION_JSON", "schema": COACH_OUTPUT_SCHEMA}}, "maxOutputTokens": 900},
     }
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(18.0, connect=4.0)) as client:

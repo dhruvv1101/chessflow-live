@@ -746,6 +746,9 @@ function App() {
     const arrow = { from: selectedReviewRow.opponentResponse.slice(0, 2), to: selectedReviewRow.opponentResponse.slice(2, 4), kind: 'tactical' };
     if (!boardArrows.some((current) => current.from === arrow.from && current.to === arrow.to)) boardArrows.push(arrow);
   }
+  if (practiceSession?.showBest && practiceSession.bestUci) {
+    boardArrows.unshift({ from: practiceSession.bestUci.slice(0, 2), to: practiceSession.bestUci.slice(2, 4), kind: 'best' });
+  }
   return <DashboardLayout
     chess={chess} fen={boardFen} human={human} sideChoice={sideChoice} difficulty={difficulty} config={config}
     engineState={engineState} engineError={engineError} thinking={thinking} hints={hints} promotion={promotion}

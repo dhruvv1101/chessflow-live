@@ -12,9 +12,9 @@ export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOppone
     <p className="coach-summary"><strong>{row.san}</strong> · evaluation loss <strong>{row.lossCp} cp</strong>{row.depth ? ` · depth ${row.depth}` : ''}</p>
     <div className="coach-actions">
       <button className="button button-yellow" onClick={onExplain} disabled={coach.state === 'loading'}>{coach.state === 'loading' ? 'Explaining…' : 'Explain This Move'}</button>
-      <button className="button button-outline" onClick={onShowOpponentPlan}>Show Opponent’s Plan</button>
-      <button className="button button-outline" onClick={onShowBetterMove}>Show Better Move</button>
-      <button className="button button-outline" onClick={onPractice} disabled={!severe}>Practice This Mistake</button>
+      <button className="button button-outline" onClick={() => { setDetailsOpen(true); onShowOpponentPlan(row); }}>Show Opponent’s Plan</button>
+      <button className="button button-outline" onClick={() => { setDetailsOpen(true); onShowBetterMove(row); }}>Show Better Move</button>
+      <button className="button button-outline" onClick={() => onPractice(row)} disabled={!severe}>Practice This Mistake</button>
     </div>
     {coach.error && <p className="coach-fallback" role="status">{coach.error} Stockfish lines are shown below.</p>}
     {explanation && <div className="coach-explanation" aria-live="polite">
@@ -31,6 +31,7 @@ export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOppone
     <details open={detailsOpen} onToggle={(event) => setDetailsOpen(event.currentTarget.open)} className="coach-engine-details">
       <summary>Stockfish evidence and alternatives</summary>
       <p>Best move: <strong>{row.bestSan}</strong> · played: <strong>{row.san}</strong> · before {row.beforeEvalText || '—'} · after {row.eval}</p>
+      <p><strong>Verified opponent continuation:</strong> {row.punishmentSan?.join(' ') || row.opponentSan || 'No continuation available.'}</p>
       <ol>{(row.variations || []).slice(0, 3).map((line, index) => <li key={`${line.uci?.[0]}-${index}`}><strong>{line.san?.[0] || '—'}</strong> {line.san?.slice(1, 6).join(' ')} <span>{line.cp == null ? '' : `${(line.cp / 100).toFixed(2)} White`}</span></li>)}</ol>
       <p className="small-meta">Opening names and trap claims are omitted because no opening database is configured.</p>
     </details>

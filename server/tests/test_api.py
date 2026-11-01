@@ -187,7 +187,7 @@ def test_coach_discards_model_moves_outside_validated_stockfish_lines(monkeypatc
         async def __aexit__(self, *_args): pass
         async def post(self, _url, *, headers, json):
             assert headers["x-goog-api-key"] == "test-only"
-            assert json["generationConfig"]["responseFormat"]["text"]["mimeType"] == "application/json"
+            assert json["generationConfig"]["responseFormat"]["text"]["mimeType"] == "APPLICATION_JSON"
             return FakeResponse()
 
     monkeypatch.setattr(api.httpx, "AsyncClient", FakeAsyncClient)
