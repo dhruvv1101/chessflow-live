@@ -20,7 +20,7 @@ export default function DashboardLayout({
   chess, fen, human, sideChoice, difficulty, config, engineState, engineError, thinking,
   hints, promotion, notice, resigned, pgn, setPgn, reviewRows, reviewState, reviewProgress,
   status, sideToMove, options, moveListRef, moves, startGame, setDifficulty, requestHint,
-  undo, setResigned, setNotice, importFinishedPgn, promote, setPromotion, onBoardKeyDown,
+  undo, setResigned, setNotice, onResignAi, importFinishedPgn, promote, setPromotion, onBoardKeyDown,
   settings, onSettingsChange, resetSettings, clearSavedGame, dragState,
   onBoardPointerDown, onBoardPointerMove, onBoardPointerUp, onBoardPointerCancel, onBoardMouseLeave,
   mode, localSession, savedLocalGame, startLocalGame, resumeLocalGame, hintLoading, engineProgress, onCancelHint, onResignLocal, onOfferDraw, localOutcome,
@@ -29,9 +29,11 @@ export default function DashboardLayout({
   onLoadCloudGame,
   timelineMoves, currentPly, onNavigate, replayPlaying, onToggleReplay, isViewingHistory,
   selectedReviewRow, coach, onExplainMove, onShowOpponentPlan, onShowBetterMove, onPracticeMistake,
-  practiceSession, boardArrows,
+  practiceSession, boardArrows, gamePgn, hasGameMoves, copyGamePgn, downloadGamePgn, analyzeGamePgn,
+  pgnActionMessage, copyFailurePgn, reviewGameInProgress,
 }) {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const [copyErrorArea, setCopyErrorArea] = React.useState(null);
   const [localNames, setLocalNames] = React.useState({ whiteName: 'White', blackName: 'Black' });
   const [flipMotion, setFlipMotion] = React.useState(false);
   React.useEffect(() => {
@@ -40,6 +42,9 @@ export default function DashboardLayout({
     const timer = window.setTimeout(() => setFlipMotion(false), 220);
     return () => window.clearTimeout(timer);
   }, [fen, mode, localSession?.options.orientation]);
+  React.useEffect(() => {
+    if (copyFailurePgn && copyErrorArea) { copyErrorArea.focus(); copyErrorArea.select(); }
+  }, [copyFailurePgn, copyErrorArea]);
   const activeLine = hints[sideToMove]?.lines?.[0];
   const gameOver = ['checkmate', 'stalemate', 'draw'].includes(status.kind) || resigned;
   const startNewGame = () => mode === 'local' ? startLocalGame(localSession.options) : startGame();
@@ -54,7 +59,7 @@ export default function DashboardLayout({
       <button className="button button-outline settings-button" aria-label="Settings" onClick={() => setSettingsOpen(true)}><ActionIcon name="settings"/><span>Settings</span></button>
     </header>
     <span className={`server-status-chip ${engineServerStatus.state}`} role="status" aria-label={`Engine server: ${engineServerStatus.state === 'online' ? 'Online' : engineServerStatus.state === 'offline' ? 'Offline' : 'Using browser engine'}`}><i aria-hidden="true"/>{engineServerStatus.state === 'online' ? 'Online' : engineServerStatus.state === 'offline' ? 'Offline' : 'Using browser engine'}</span>
-    {settingsOpen && <SettingsPanel settings={settings} onChange={onSettingsChange} onReset={resetSettings} onClearSavedGame={clearSavedGame} onClose={() => setSettingsOpen(false)} engineServerStatus={engineServerStatus} fen={fen} pgn={pgn} onLoadCloudGame={onLoadCloudGame}/>}
+    {settingsOpen && <SettingsPanel settings={settings} onChange={onSettingsChange} onReset={resetSettings} onClearSavedGame={clearSavedGame} onClose={() => setSettingsOpen(false)} engineServerStatus={engineServerStatus} fen={fen} pgn={gamePgn} onLoadCloudGame={onLoadCloudGame}/>}
 
     {mode !== 'local' && <><section className="hero" id="top">
       <p className="eyebrow"><span className="eyebrow-square"/> YOUR BOARD. YOUR MOVE.</p>
@@ -103,7 +108,7 @@ export default function DashboardLayout({
       {reviewProgress && <p className="review-progress" role="status">{reviewProgress}</p>}
       {reviewRows.length > 0 && <div className="review-results">
         <PanelErrorBoundary panel="Evaluation graph"><EvaluationGraph rows={reviewRows} currentPly={currentPly} onSelectPly={onNavigate}/></PanelErrorBoundary>
-        <section className="folder-card review-table-card"><div className="folder-tab tab-yellow" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-yellow" aria-hidden="true">#</div><div><p className="meta-line">MOVE BY MOVE</p><h2>Review notes</h2></div></div><p className="small-meta">{reviewState === 'done' ? 'Short before/after searches; evaluations stay from White’s view.' : reviewProgress}</p><div className="review-table-wrap"><table className="review-table"><thead><tr><th>#</th><th>Move</th><th>Eval</th><th>Review</th></tr></thead><tbody>{reviewRows.map((row) => <tr key={row.number}><td>{row.number}</td><td>{sideName(row.color)} · {row.san}</td><td>{row.eval}</td><td><ReviewBadge label={row.label}/></td></tr>)}</tbody></table></div>{reviewState === 'failed' && <p className="error-copy" role="alert">Review stopped early. {notice}</p>}</section>
+        <section className="folder-card review-table-card"><div className="folder-tab tab-yellow" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-yellow" aria-hidden="true">#</div><div><p className="meta-line">MOVE BY MOVE</p><h2>Review notes</h2>{reviewGameInProgress && <span className="review-progress-label">Game in progress</span>}</div></div><p className="small-meta">{reviewState === 'done' ? 'Short before/after searches; evaluations stay from White’s view.' : reviewProgress}</p><div className="review-table-wrap"><table className="review-table"><thead><tr><th>#</th><th>Move</th><th>Eval</th><th>Review</th></tr></thead><tbody>{reviewRows.map((row) => <tr key={row.number}><td>{row.number}</td><td>{sideName(row.color)} · {row.san}</td><td>{row.eval}</td><td><ReviewBadge label={row.label}/></td></tr>)}</tbody></table></div>{reviewState === 'failed' && <p className="error-copy" role="alert">Review stopped early. {notice}</p>}</section>
         <ChessAnalysisPanel row={selectedReviewRow} coach={coach} onExplain={onExplainMove} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPractice={onPracticeMistake}/>
         <OpeningAnalysis moves={timelineMoves}/>
         <MistakeStatistics reviewedCount={reviewRows.length}/>
@@ -133,7 +138,7 @@ export default function DashboardLayout({
 
         <section className="folder-card runtime-panel"><div className="folder-tab tab-yellow" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-yellow" aria-hidden="true"><span className={`status-glyph ${engineState}`}>{engineState === 'ready' ? '✓' : engineState === 'loading' ? '…' : '!'}</span></div><div><p className="meta-line">RUNTIME STATUS</p><h2>Engine status</h2></div></div><dl><div><dt>Mode</dt><dd>{mode === 'local' ? 'Two players' : 'Web'}</dd></div><div><dt>Engine</dt><dd>{mode === 'local' ? 'Stockfish · hints only' : 'Stockfish WASM'}</dd></div><div><dt>Ready</dt><dd><span className={`status-word ${engineState}`}>{engineState === 'ready' ? 'YES' : engineState === 'loading' ? 'LOADING' : 'NO'}</span></dd></div>{mode !== 'local' && <><div><dt>Skill level</dt><dd>{config.skill} / 20</dd></div><div><dt>Thinking time</dt><dd>{config.movetime} ms</dd></div></>}</dl>{engineError && <p className="error-copy" role="alert">{engineError}</p>}</section>
 
-        <section className={`folder-card action-card ${mode === 'local' ? 'is-local' : 'is-ai'}`}><div className="folder-tab tab-pink" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-pink" aria-hidden="true">↗</div><div><p className="meta-line">YOUR MOVE</p><h2>Game controls</h2></div></div>{mode === 'local' && !localSession?.options.hintsAllowed ? <p className="small-meta hints-disabled">Hints are disabled for this game.</p> : <><button className="button button-lime hint-button" onClick={requestHint} disabled={thinking || (gameOver && !isViewingHistory)}><ActionIcon name="hint"/>{mode === 'local' ? `Hint for ${sideToMove === 'w' ? localSession?.options.whiteName : localSession?.options.blackName}` : thinking ? 'Thinking…' : 'Get a hint'}</button>{hintLoading && <button className="button button-outline" onClick={onCancelHint}>Cancel hint search</button>}{engineState === 'loading' && <label className="engine-progress-label">Loading engine assets <progress max="100" value={engineProgress}>{engineProgress}%</progress></label>}</>}<div className="action-grid"><button className="button button-outline" onClick={undo} disabled={isViewingHistory || Boolean(practiceSession) || !chess.history().length}><ActionIcon name="undo"/>Undo {mode === 'local' ? 'one ply' : ''}</button>{mode === 'local' && <button className="button button-outline" onClick={onOfferDraw} disabled={isViewingHistory || Boolean(practiceSession)}>Offer draw</button>}<button className="button button-outline" onClick={() => { if (mode === 'local') onResignLocal(); else { setResigned(true); setNotice('You resigned. Start a new game whenever you are ready.'); } }} disabled={gameOver || isViewingHistory || Boolean(practiceSession)}><ActionIcon name="resign"/>Resign</button><button className="button button-yellow action-new" onClick={startNewGame}><ActionIcon name="new"/>New game</button></div><p className="small-meta action-helper" title="Moves are legal only. Use click, drag, or keyboard controls.">Moves are legal only.</p></section>
+        <section className={`folder-card action-card ${mode === 'local' ? 'is-local' : 'is-ai'}`}><div className="folder-tab tab-pink" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-pink" aria-hidden="true">↗</div><div><p className="meta-line">YOUR MOVE</p><h2>Game controls</h2></div></div>{mode === 'local' && !localSession?.options.hintsAllowed ? <p className="small-meta hints-disabled">Hints are disabled for this game.</p> : <><button className="button button-lime hint-button" onClick={requestHint} disabled={thinking || (gameOver && !isViewingHistory)}><ActionIcon name="hint"/>{mode === 'local' ? `Hint for ${sideToMove === 'w' ? localSession?.options.whiteName : localSession?.options.blackName}` : thinking ? 'Thinking…' : 'Get a hint'}</button>{hintLoading && <button className="button button-outline" onClick={onCancelHint}>Cancel hint search</button>}{engineState === 'loading' && <label className="engine-progress-label">Loading engine assets <progress max="100" value={engineProgress}>{engineProgress}%</progress></label>}</>}<div className="action-grid"><button className="button button-outline" onClick={undo} disabled={isViewingHistory || Boolean(practiceSession) || !chess.history().length}><ActionIcon name="undo"/>Undo {mode === 'local' ? 'one ply' : ''}</button>{mode === 'local' && <button className="button button-outline" onClick={onOfferDraw} disabled={isViewingHistory || Boolean(practiceSession)}>Offer draw</button>}<button className="button button-outline" onClick={() => { if (mode === 'local') onResignLocal(); else { onResignAi(); } }} disabled={gameOver || isViewingHistory || Boolean(practiceSession)}><ActionIcon name="resign"/>Resign</button><button className="button button-yellow action-new" onClick={startNewGame}><ActionIcon name="new"/>New game</button></div><p className="small-meta action-helper" title="Moves are legal only. Use click, drag, or keyboard controls.">Moves are legal only.</p><div className="game-pgn-actions"><button className="button button-outline" onClick={copyGamePgn} disabled={!hasGameMoves}><ActionIcon name="copy"/>Copy PGN</button><button className="button button-outline" onClick={downloadGamePgn} disabled={!hasGameMoves}><ActionIcon name="download"/>Download .pgn</button><button className="button button-outline" onClick={analyzeGamePgn} disabled={!hasGameMoves}><ActionIcon name="review"/>Analyze this game</button></div><p className="pgn-action-status" role="status" aria-live="polite">{pgnActionMessage}</p>{copyFailurePgn && <textarea ref={setCopyErrorArea} className="copy-fallback-pgn" aria-label="PGN selected for manual copying" readOnly value={copyFailurePgn}/>}</section>
 
       </div>
     </div>
@@ -144,6 +149,8 @@ export default function DashboardLayout({
 function ActionIcon({ name }) {
   const paths = {
     new: <path d="M12 5v14M5 12h14"/>,
+    copy: <><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></>,
+    download: <><path d="M12 3v12m0 0 4-4m-4 4-4-4"/><path d="M5 17v4h14v-4"/></>,
     review: <><path d="M5 19 19 5M7 5h12v12"/></>,
     hint: <><path d="M9 18h6M10 22h4M8 14c-1.6-1.2-2.5-3-2.5-5a6.5 6.5 0 1 1 13 0c0 2-1 3.8-2.5 5-.7.6-1 1.2-1 2h-6c0-.8-.3-1.4-1-2Z"/></>,
     undo: <><path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-2"/></>,

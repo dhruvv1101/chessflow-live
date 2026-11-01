@@ -83,3 +83,24 @@ test('pieces retain consistent rendered styles after e2-e4 and the AI reply', as
     expect(pieces.every((piece) => piece.filter === 'none'), `${type} filter value`).toBe(true);
   }
 });
+
+test('copies the full in-progress game PGN and opens that game in review', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'White' }).click();
+  await page.locator('[data-square="e2"]').click();
+  await page.locator('[data-square="e4"]').click();
+  await expect(page.locator('.count-badge')).toHaveText('2 ply', { timeout: 30_000 });
+
+  await page.getByRole('button', { name: 'Copy PGN' }).click();
+  await expect(page.locator('.pgn-action-status')).toHaveText('PGN copied');
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('[Event "ChessFlow Live game"]');
+  expect(copied).toContain('[Result "*"]');
+  expect(copied).toContain('1. e4');
+
+  await page.getByRole('button', { name: 'Analyze this game' }).click();
+  await expect(page.getByRole('heading', { name: 'Review notes' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('.review-progress-label')).toHaveText('Game in progress');
+});

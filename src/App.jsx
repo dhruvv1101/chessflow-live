@@ -13,6 +13,7 @@ import { DEFAULT_LOCAL_OPTIONS, LOCAL_GAME_VERSION, addClockIncrement, clearLoca
 import { buildTimeline, calculateEvaluationLoss, classifyMove, legalVariation, scoreToWhiteCp } from './analysis.js';
 import { analyzeCoachMove, cacheCoachExplanation, coachCacheKey, getCachedCoachExplanation } from './engine/coach.js';
 import { recordTrainingGame } from './training.js';
+import { buildGamePgn, resultForGame } from './pgn.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -40,15 +41,19 @@ function App() {
   const [promotion, setPromotion] = useState(null);
   const [notice, setNotice] = useState('Choose a side and start a new game.');
   const [resigned, setResigned] = useState(false);
+  const [resignedColor, setResignedColor] = useState(null);
   const [pgn, setPgn] = useState('');
   const [reviewRows, setReviewRows] = useState([]);
   const [reviewState, setReviewState] = useState('idle');
   const [reviewProgress, setReviewProgress] = useState('');
+  const [reviewGameInProgress, setReviewGameInProgress] = useState(false);
   const [reviewTimeline, setReviewTimeline] = useState(null);
   const [selectedPly, setSelectedPly] = useState(null);
   const [replayPlaying, setReplayPlaying] = useState(false);
   const [coach, setCoach] = useState({ state: 'idle', explanation: null, error: '' });
   const [practiceSession, setPracticeSession] = useState(null);
+  const [pgnActionMessage, setPgnActionMessage] = useState('');
+  const [copyFailurePgn, setCopyFailurePgn] = useState('');
   const [mode, setMode] = useState('ai');
   const [localOutcome, setLocalOutcome] = useState('');
   const [localSession, setLocalSession] = useState(null);
@@ -71,12 +76,29 @@ function App() {
   const gameOver = status.kind === 'checkmate' || status.kind === 'stalemate' || status.kind === 'draw' || resigned;
   const moves = useMemo(() => getMoveList(chess), [fen]);
   const timeline = useMemo(() => reviewTimeline || buildTimeline(startFenRef.current, chess.history()), [fen, gameVersion, reviewTimeline]);
+  const isReviewTimeline = Boolean(reviewTimeline);
+  const exportSource = useMemo(() => {
+    if (!reviewTimeline) return { game: chess, startFen: startFenRef.current };
+    const game = new Chess(reviewTimeline.initialFen);
+    for (const move of reviewTimeline.moves) game.move(move.san);
+    return { game, startFen: reviewTimeline.initialFen };
+  }, [chess, fen, gameVersion, reviewTimeline]);
   const activePly = Math.max(0, Math.min(timeline.moves.length, selectedPly ?? timeline.moves.length));
   const boardFen = practiceSession?.fen || timeline.fens[activePly] || fen;
   const displayChess = useMemo(() => new Chess(boardFen), [boardFen]);
   const displayStatus = getGameStatus(displayChess);
   const displaySideToMove = displayChess.turn();
-  const isReviewTimeline = Boolean(reviewTimeline);
+  const gamePgn = useMemo(() => {
+    const white = mode === 'local' ? (localSession?.options.whiteName || 'White') : human === 'w' ? 'You' : `Stockfish (skill ${config.skill})`;
+    const black = mode === 'local' ? (localSession?.options.blackName || 'Black') : human === 'b' ? 'You' : `Stockfish (skill ${config.skill})`;
+    return buildGamePgn(exportSource.game, {
+      startFen: exportSource.startFen,
+      white,
+      black,
+      result: resultForGame({ status: isReviewTimeline ? getGameStatus(exportSource.game) : status, resigned, localOutcome, resignedColor }),
+    });
+  }, [config.skill, exportSource, human, isReviewTimeline, localOutcome, localSession, mode, resigned, resignedColor, status]);
+  const hasGameMoves = exportSource.game.history().length > 0;
   const isViewingHistory = !practiceSession && (isReviewTimeline || selectedPly !== null);
   const currentDisplayFenRef = useRef(boardFen);
   currentDisplayFenRef.current = boardFen;
@@ -112,13 +134,26 @@ function App() {
   const loadCloudGame = (game) => {
     try {
       reviewRunRef.current += 1;
-      const restored = new Chess(game.fen);
+      const savedPosition = new Chess(game.fen);
+      let restored = savedPosition;
+      let savedStartFen = savedPosition.fen();
+      if (typeof game.pgn === 'string' && game.pgn.trim()) {
+        try {
+          const withHistory = new Chess();
+          withHistory.loadPgn(game.pgn);
+          if (withHistory.history().length && withHistory.fen() === savedPosition.fen()) {
+            restored = withHistory;
+            savedStartFen = withHistory.header().FEN || new Chess().fen();
+          }
+        } catch { /* A FEN-only legacy save remains loadable. */ }
+      }
       chessRef.current = restored;
-      startFenRef.current = restored.fen();
+      startFenRef.current = savedStartFen;
       setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false);
       setPgn(game.pgn || '');
       setMode('ai');
       setResigned(false);
+      setResignedColor(null);
       setLocalOutcome('');
       publishPosition();
       setNotice(`Loaded cloud game: ${game.name}.`);
@@ -341,6 +376,7 @@ function App() {
     setSideChoice(choice);
     setHuman(choice === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : choice);
     setResigned(false);
+    setResignedColor(null);
     setLocalOutcome('');
     setThinking(false);
     setReviewRows([]);
@@ -373,7 +409,7 @@ function App() {
     const initialClocks = localClockStart(normalized.clock);
     const initial = makeLocalSnapshot(initialGame(), normalized, { w: initialClocks.w, b: initialClocks.b }, { w: 0, b: 0 });
     chessRef.current = initialGame(); startFenRef.current = chessRef.current.fen(); setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false); setPracticeSession(null); setMode('local'); setLocalSession(initial); localSessionRef.current = initial;
-    writeLocalGame(initial); setSavedLocalGame(initial); setHuman('w'); setSideChoice('w'); setResigned(false); setLocalOutcome(''); lastClockTickRef.current = Date.now();
+    writeLocalGame(initial); setSavedLocalGame(initial); setHuman('w'); setSideChoice('w'); setResigned(false); setResignedColor(null); setLocalOutcome(''); lastClockTickRef.current = Date.now();
     setThinking(false); setReviewRows([]); setReviewState('idle'); setHints({ w: null, b: null });
     setGameVersion((value) => value + 1); publishPosition();
     setNotice(`${whiteName} to move (White).`);
@@ -384,7 +420,7 @@ function App() {
     const stored = readLocalGame();
     if (!stored) { setSavedLocalGame(null); return; }
     Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); chessRef.current = restoreChess(stored); startFenRef.current = new Chess().fen(); setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false); setPracticeSession(null); localSessionRef.current = stored;
-    setLocalSession(stored); setMode('local'); setHuman('w'); setSideChoice('w'); setResigned(false);
+    setLocalSession(stored); setMode('local'); setHuman('w'); setSideChoice('w'); setResigned(false); setResignedColor(null);
     setLocalOutcome(''); lastClockTickRef.current = Date.now();
     setGameVersion((value) => value + 1); publishPosition(); setNotice('Two-player game resumed.');
   };
@@ -407,6 +443,7 @@ function App() {
       const opponent = side === 'w' ? 'b' : 'w';
       const insufficient = chessRef.current.isInsufficientMaterial();
       setResigned(true);
+      setResignedColor(side);
       setLocalOutcome(insufficient ? 'flag-draw' : 'flag');
       setNotice(insufficient ? 'Draw: the opponent cannot checkmate with the remaining material.' : `${side === 'w' ? localSession.options.whiteName : localSession.options.blackName} flagged. ${opponent === 'w' ? localSession.options.whiteName : localSession.options.blackName} wins.`);
     }
@@ -599,19 +636,22 @@ function App() {
     }
     setThinking(false);
     setResigned(false);
+    setResignedColor(null);
     setLocalOutcome('');
     publishPosition();
     setNotice('Last turn undone.');
   };
 
-  const importFinishedPgn = async () => {
+  const importFinishedPgn = async (sourcePgn = pgn) => {
     let parsed;
     try {
       parsed = new Chess();
-      parsed.loadPgn(pgn);
-      if (!parsed.history().length || !['1-0', '0-1', '1/2-1/2'].includes(parsed.header().Result)) throw new Error('Import a finished game with a recorded result (1-0, 0-1, or 1/2-1/2).');
+      parsed.loadPgn(sourcePgn);
+      if (!parsed.history().length || !['1-0', '0-1', '1/2-1/2', '*', undefined].includes(parsed.header().Result)) throw new Error('Import a game with a recorded result (1-0, 0-1, 1/2-1/2, or *).');
     } catch (error) { setNotice(`PGN error: ${error.message}`); return; }
     const header = parsed.header();
+    setPgn(sourcePgn);
+    setReviewGameInProgress(header.Result === '*' || !header.Result);
     const history = parsed.history();
     let review;
     try { review = buildTimeline(header.FEN || new Chess().fen(), history); }
@@ -626,6 +666,7 @@ function App() {
     setReviewRows([]);
     setReviewState('reviewing');
     setResigned(false);
+    setResignedColor(null);
     setLocalOutcome('');
     setThinking(true);
     try {
@@ -680,12 +721,54 @@ function App() {
       if (reviewRun !== reviewRunRef.current) return;
       recordTrainingGame(results, pgn);
       setReviewState('done');
-      setNotice(`Review complete: ${history.length} plies evaluated. Opening-book names are unavailable without an opening database.`);
+      setNotice(`Review complete: ${history.length} plies evaluated.${header.Result === '*' || !header.Result ? ' Game in progress.' : ''} Opening-book names are unavailable without an opening database.`);
     } catch (error) {
       if (reviewRun !== reviewRunRef.current) return;
       setReviewState('failed');
       setNotice(`Review stopped: ${error.message}`);
     } finally { if (reviewRun === reviewRunRef.current) { setThinking(false); setReviewProgress(''); } }
+  };
+
+  const copyGamePgn = async () => {
+    let copied = false;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(gamePgn);
+      copied = true;
+    } catch {
+      const textarea = document.createElement('textarea');
+      textarea.value = gamePgn;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.append(textarea);
+      textarea.select();
+      try { copied = document.execCommand('copy'); } catch { copied = false; }
+      textarea.remove();
+    }
+    if (copied) {
+      setCopyFailurePgn('');
+      setPgnActionMessage('PGN copied');
+    } else {
+      setCopyFailurePgn(gamePgn);
+      setPgnActionMessage('Could not copy PGN. It is selected below so you can copy it manually.');
+    }
+  };
+
+  const downloadGamePgn = () => {
+    const blob = new Blob([gamePgn], { type: 'application/x-chess-pgn;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'chessflow-live-game.pgn';
+    link.click();
+    URL.revokeObjectURL(url);
+    setPgnActionMessage('PGN download started');
+  };
+
+  const analyzeCurrentGame = () => {
+    if (!exportSource.game.history().length) return;
+    void importFinishedPgn(gamePgn);
   };
 
   const darkEffective = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
@@ -767,15 +850,17 @@ function App() {
     settings={settings} onSettingsChange={changeSettings} resetSettings={resetSettings}
     engineServerStatus={engineServerStatus}
     onLoadCloudGame={loadCloudGame}
+    onResignAi={() => { setResigned(true); setResignedColor(human); setNotice('You resigned. Start a new game whenever you are ready.'); }}
+    gamePgn={gamePgn} hasGameMoves={hasGameMoves} copyGamePgn={copyGamePgn} downloadGamePgn={downloadGamePgn} analyzeGamePgn={analyzeCurrentGame} pgnActionMessage={pgnActionMessage} copyFailurePgn={copyFailurePgn}
     clearSavedGame={() => { startGame(); try { localStorage.removeItem('chessflow-live.saved-game.v1'); } catch { /* storage may be unavailable */ } }}
     mode={mode} localSession={localSession} savedLocalGame={savedLocalGame} startLocalGame={startLocalGame}
     bestHintMove={bestHintMove} whiteOrientation={whiteOrientation}
     timelineMoves={timeline.moves} currentPly={activePly} onNavigate={navigateToPly} replayPlaying={replayPlaying} onToggleReplay={toggleReplay} isViewingHistory={isViewingHistory}
-    selectedReviewRow={selectedReviewRow} coach={coach} onExplainMove={() => selectedReviewRow && explainMove(selectedReviewRow)} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPracticeMistake={startPractice}
+    selectedReviewRow={selectedReviewRow} coach={coach} onExplainMove={() => selectedReviewRow && explainMove(selectedReviewRow)} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPracticeMistake={startPractice} reviewGameInProgress={reviewGameInProgress}
     practiceSession={practiceSession} boardArrows={boardArrows}
     resumeLocalGame={resumeLocalGame} hintLoading={hintLoading} engineProgress={engineProgress} onCancelHint={() => { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setThinking(false); setNotice('Hint search canceled.'); }}
     localOutcome={localOutcome}
-    onResignLocal={() => { const who = window.prompt('Who resigns? Enter White or Black.'); if (!who) return; const color = who.trim().toLowerCase() === 'white' ? 'w' : who.trim().toLowerCase() === 'black' ? 'b' : null; if (!color) { setNotice('Enter White or Black to resign.'); return; } const name = color === 'w' ? localSession?.options.whiteName : localSession?.options.blackName; if (window.confirm(`${name} resigns? Confirm to end the game.`)) { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setResigned(true); setLocalOutcome('resign'); setNotice(`${name} resigned. ${color === 'w' ? localSession.options.blackName : localSession.options.whiteName} wins.`); } }}
+    onResignLocal={() => { const who = window.prompt('Who resigns? Enter White or Black.'); if (!who) return; const color = who.trim().toLowerCase() === 'white' ? 'w' : who.trim().toLowerCase() === 'black' ? 'b' : null; if (!color) { setNotice('Enter White or Black to resign.'); return; } const name = color === 'w' ? localSession?.options.whiteName : localSession?.options.blackName; if (window.confirm(`${name} resigns? Confirm to end the game.`)) { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setResigned(true); setResignedColor(color); setLocalOutcome('resign'); setNotice(`${name} resigned. ${color === 'w' ? localSession.options.blackName : localSession.options.whiteName} wins.`); } }}
     onOfferDraw={() => { const opponent = sideToMove === 'w' ? localSession?.options.blackName : localSession?.options.whiteName; const outcome = resolveDrawOffer(window.confirm(`Draw offered. ${opponent}, accept the draw?`)); if (outcome === 'draw') { positionIdRef.current += 1; Object.values(engineRefs.current).forEach((engine) => engine?.cancel()); setHints({ w: null, b: null }); setHintLoading(false); setResigned(true); setLocalOutcome('draw'); setNotice('Draw agreed by both players.'); } else setNotice('Draw offer declined.'); }}
   />;
 }
