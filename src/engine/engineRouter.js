@@ -2,9 +2,9 @@ import { analyzeRemote } from './remoteEngine.js';
 
 export async function analyzeWithRouter({ fen, options, purpose, hintEngine = 'auto', positionId,
   getPositionId, browserAnalyze, onFallback, remoteAnalyze = analyzeRemote }) {
-  const serverConfigured = Boolean(import.meta.env.VITE_ENGINE_API_URL);
+  const serverConfigured = Boolean(import.meta.env.VITE_ENGINE_API_URL) && import.meta.env.VITE_ENGINE_SERVER_ENABLED !== 'false';
   const eligible = purpose === 'hint' || purpose === 'review';
-  if (!eligible || hintEngine === 'browser' || (!serverConfigured && hintEngine === 'auto')) return browserAnalyze();
+  if (!eligible || hintEngine === 'browser' || import.meta.env.VITE_ENGINE_SERVER_ENABLED === 'false' || (!serverConfigured && hintEngine !== 'server')) return browserAnalyze();
   try {
     return await remoteAnalyze(fen, { ...options, positionId, getPositionId });
   } catch (error) {

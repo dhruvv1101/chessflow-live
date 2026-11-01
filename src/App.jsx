@@ -4,6 +4,7 @@ import { DIFFICULTIES, ENGINE } from './config.js';
 import { Engine } from './engine.js';
 import { engineAssetSet, preloadEngineAssets } from './engineAssets.js';
 import { analyzeWithRouter } from './engine/engineRouter.js';
+import { reportEngineUse, useEngineServerStatus } from './engine/useEngineServerStatus.js';
 import { formatEvaluation, getGameStatus, getMoveList, makeLegalMove } from './game.js';
 import DashboardLayout from './DashboardLayout.jsx';
 import { CHESS_PIECES } from './pieces.jsx';
@@ -14,6 +15,7 @@ const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
 
 function App() {
+  const engineServerStatus = useEngineServerStatus();
   const chessRef = useRef(initialGame());
   const engineRefs = useRef({ play: null, hint: null });
   const moveListRef = useRef(null);
@@ -83,6 +85,20 @@ function App() {
     setDifficulty(DEFAULT_SETTINGS.defaultDifficulty);
   };
 
+  const loadCloudGame = (game) => {
+    try {
+      const restored = new Chess(game.fen);
+      if (!restored.isValid()) throw new Error('Saved FEN is invalid.');
+      chessRef.current = restored;
+      setPgn(game.pgn || '');
+      setMode('ai');
+      setResigned(false);
+      setLocalOutcome('');
+      publishPosition();
+      setNotice(`Loaded cloud game: ${game.name}.`);
+    } catch (error) { setNotice(`Could not load cloud game: ${error.message}`); }
+  };
+
   const resetBoardInteraction = useCallback((clearSelection = true) => {
     const active = dragRef.current;
     dragRef.current = null;
@@ -143,7 +159,8 @@ function App() {
     try {
       const result = await analyzeWithRouter({ fen: position, options, purpose, hintEngine: settings.hintEngine,
         positionId: searchId, getPositionId: () => positionIdRef.current, browserAnalyze,
-        onFallback: (error) => { setNotice(`Server engine unavailable (${error.message}). Using browser engine.`); } });
+        onFallback: (error) => { reportEngineUse('browser'); setNotice(`Server engine unavailable (${error.message}). Using browser engine.`); } });
+      reportEngineUse(result.engineInfo?.source === 'Server engine' ? 'server' : 'browser');
       if (result.engineInfo?.source === 'Server engine') setEngineState('ready');
       return result;
     } catch (error) {
@@ -532,6 +549,8 @@ function App() {
     onBoardPointerDown={onBoardPointerDown} onBoardPointerMove={onBoardPointerMove}
     onBoardPointerUp={onBoardPointerUp} onBoardPointerCancel={onBoardPointerCancel} onBoardMouseLeave={onBoardMouseLeave}
     settings={settings} onSettingsChange={changeSettings} resetSettings={resetSettings}
+    engineServerStatus={engineServerStatus}
+    onLoadCloudGame={loadCloudGame}
     clearSavedGame={() => { startGame(); try { localStorage.removeItem('chessflow-live.saved-game.v1'); } catch { /* storage may be unavailable */ } }}
     mode={mode} localSession={localSession} savedLocalGame={savedLocalGame} startLocalGame={startLocalGame}
     bestHintMove={bestHintMove} whiteOrientation={whiteOrientation}

@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 
 test('dashboard adapts to phone and desktop widths', async ({ page }) => {
+  await page.route('**/health', (route) => route.fulfill({ json: { ok: true, engine: 'Stockfish 19', threads: 2, hash_mb: 128 } }));
+  await page.route('**/analyze', (route) => route.fulfill({ json: { best_uci: 'e2e4', engine: 'Stockfish 19', depth: 18, nodes: 1234, time_ms: 20, lines: [1, 2, 3].map((rank) => ({ rank, uci: 'e2e4', san: 'e4', pv_uci: ['e2e4'], pv_san: ['e4'], cp_white: 25, mate_white: null })) } }));
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
   page.on('console', (message) => {

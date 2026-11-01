@@ -19,6 +19,8 @@ export default function DashboardLayout({
   onBoardPointerDown, onBoardPointerMove, onBoardPointerUp, onBoardPointerCancel, onBoardMouseLeave,
   mode, localSession, savedLocalGame, startLocalGame, resumeLocalGame, hintLoading, engineProgress, onCancelHint, onResignLocal, onOfferDraw, localOutcome,
   bestHintMove, whiteOrientation,
+  engineServerStatus,
+  onLoadCloudGame,
 }) {
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [localNames, setLocalNames] = React.useState({ whiteName: 'White', blackName: 'Black' });
@@ -42,7 +44,8 @@ export default function DashboardLayout({
       <div className="top-actions"><span className={`engine-pill ${engineState}`}><span className="engine-status-icon" aria-hidden="true">{engineState === 'ready' ? '✓' : engineState === 'loading' ? '…' : '!'}</span><span>{engineLabel(engineState)}</span></span>{mode === 'local' && <button className="button button-outline ai-switch-button" aria-label="Switch to AI mode" onClick={() => startGame('w')}>AI mode</button>}<button className="button button-yellow top-new-game" onClick={startNewGame}><ActionIcon name="new"/>New game</button></div>
       <button className="button button-outline settings-button" aria-label="Settings" onClick={() => setSettingsOpen(true)}><ActionIcon name="settings"/><span>Settings</span></button>
     </header>
-    {settingsOpen && <SettingsPanel settings={settings} onChange={onSettingsChange} onReset={resetSettings} onClearSavedGame={clearSavedGame} onClose={() => setSettingsOpen(false)}/>}
+    <span className={`server-status-chip ${engineServerStatus.state}`} role="status" aria-label={`Engine server: ${engineServerStatus.state === 'online' ? 'Online' : engineServerStatus.state === 'offline' ? 'Offline' : 'Using browser engine'}`}><i aria-hidden="true"/>{engineServerStatus.state === 'online' ? 'Online' : engineServerStatus.state === 'offline' ? 'Offline' : 'Using browser engine'}</span>
+    {settingsOpen && <SettingsPanel settings={settings} onChange={onSettingsChange} onReset={resetSettings} onClearSavedGame={clearSavedGame} onClose={() => setSettingsOpen(false)} engineServerStatus={engineServerStatus} fen={fen} pgn={pgn} onLoadCloudGame={onLoadCloudGame}/>}
 
     {mode !== 'local' && <><section className="hero" id="top">
       <p className="eyebrow"><span className="eyebrow-square"/> YOUR BOARD. YOUR MOVE.</p>

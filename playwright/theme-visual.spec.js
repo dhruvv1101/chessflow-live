@@ -31,6 +31,7 @@ test('captures dark and light app states at phone and desktop sizes', async ({ p
     for (const theme of ['light', 'dark']) {
       await page.goto('/');
       const settings = await chooseTheme(page, theme);
+      await settings.getByLabel('Hint engine').selectOption('server');
       await settings.getByRole('button', { name: 'Close settings' }).click();
       await screenshot(page, theme, view, 'home');
 

@@ -99,6 +99,14 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 .brand-mark, .footer-mark { display: grid; width: 38px; height: 38px; place-items: center; border: var(--line); border-radius: 12px; background: var(--cream); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 1000; letter-spacing: -.08em; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 .engine-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
+.server-status-chip { display: inline-flex; align-items: center; gap: 7px; width: fit-content; margin: 8px 0; padding: 7px 11px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 700; }
+.server-status-chip.online { color: var(--lime); }
+.server-status-chip.offline { color: var(--pink); }
+.server-engine-details { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 14px; color: var(--muted); font-size: 13px; }
+.server-engine-details > div { display: flex; justify-content: space-between; gap: 8px; }
+.server-engine-details dt { color: var(--muted); }
+.server-engine-details dd { margin: 0; color: var(--text); }
+.cloud-save-list { display: grid; gap: 8px; max-height: 180px; overflow: auto; }
 .engine-status-icon { display: grid; width: 23px; height: 23px; place-items: center; border: 2px solid var(--ink); border-radius: 7px; background: var(--cream); }
 .engine-pill.ready .engine-status-icon { background: var(--lime); }
 .engine-pill.loading .engine-status-icon { background: var(--peach); }

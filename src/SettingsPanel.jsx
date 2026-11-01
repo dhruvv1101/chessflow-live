@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import CloudSavesPanel from './CloudSavesPanel.jsx';
 
-export default function SettingsPanel({ settings, onChange, onReset, onClearSavedGame, onClose }) {
+export default function SettingsPanel({ settings, onChange, onReset, onClearSavedGame, onClose, engineServerStatus, fen, pgn, onLoadCloudGame }) {
   const dialogRef = useRef(null);
   const [confirmClear, setConfirmClear] = useState(false);
 
@@ -47,6 +48,7 @@ export default function SettingsPanel({ settings, onChange, onReset, onClearSave
 
       <section className="settings-section" aria-labelledby="engine-settings-title">
         <h3 id="engine-settings-title">Engine</h3>
+        <dl className="server-engine-details"><div><dt>Server status</dt><dd>{engineServerStatus.state === 'online' ? 'Online' : engineServerStatus.state === 'offline' ? 'Offline' : 'Using browser engine'}</dd></div><div><dt>Server engine</dt><dd>{engineServerStatus.engine || 'Not connected'}</dd></div><div><dt>Threads</dt><dd>{engineServerStatus.threads ?? '—'}</dd></div><div><dt>Last response</dt><dd>{engineServerStatus.responseTimeMs == null ? '—' : `${engineServerStatus.responseTimeMs} ms`}</dd></div></dl>
         <label className="setting-select">AI opponent engine<select aria-label="AI opponent engine" value={settings.engineChoice} onChange={(event) => onChange({ engineChoice: event.target.value })}><option value="standard">Standard (Lite)</option><option value="strong">Strong (Full)</option></select></label>
         <label className="setting-select">Hint engine<select aria-label="Hint engine" value={settings.hintEngine} onChange={(event) => onChange({ hintEngine: event.target.value })}><option value="auto">Auto</option><option value="server">Server</option><option value="browser">Browser</option></select></label>
         <label className="setting-select">Hint time<select aria-label="Hint time" value={settings.hintTime} onChange={(event) => onChange({ hintTime: Number(event.target.value) })}><option value="2000">2 seconds</option><option value="4000">4 seconds</option><option value="6000">6 seconds</option></select></label>
@@ -61,6 +63,7 @@ export default function SettingsPanel({ settings, onChange, onReset, onClearSave
           <div><button className="button button-yellow" onClick={() => { onClearSavedGame(); setConfirmClear(false); }}>Clear game</button><button className="button button-outline" onClick={() => setConfirmClear(false)}>Cancel</button></div>
         </div> : <button className="button button-outline" onClick={() => setConfirmClear(true)}>Clear saved game</button>}
       </section>
+      <CloudSavesPanel fen={fen} pgn={pgn} onLoad={onLoadCloudGame}/>
     </section>
   </dialog>;
 }
