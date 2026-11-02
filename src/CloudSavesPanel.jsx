@@ -64,7 +64,7 @@ export default function CloudSavesPanel({ fen, pgn, onLoad }) {
     <h3 id="cloud-saves-title">Cloud saves</h3>
     {!user ? <>
       {providers.github && <button className="button button-outline" disabled={busy} onClick={() => signIn('GitHub')}>Continue with GitHub</button>}
-      {providers.google && <button className="button button-outline" disabled={busy} onClick={() => signIn('Google')}>Continue with Google</button>}
+      {providers.google && <button className="button button-outline" disabled={busy} onClick={() => signIn('Google')}>Sign in with Google</button>}
       {providers.email && <><label className="setting-select">Email for magic link<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com"/></label><button className="button button-outline" disabled={busy || !email} onClick={() => run('Email', () => supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } }))}>Send magic link</button></>}
       {!providers.email && !providers.github && !providers.google && <p className="small-meta">Sign-in providers are disabled.</p>}
       {saves.length > 0 && <><p className="small-meta">Saved in this browser</p><div className="cloud-save-list">{saves.map((save) => <button className="button button-outline" key={save.id} onClick={() => onLoad(save)}>{save.name} · {new Date(save.updated_at).toLocaleDateString()}</button>)}</div></>}

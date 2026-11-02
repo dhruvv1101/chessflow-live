@@ -4,7 +4,7 @@ export function enabledAuthProviders(values = env) {
   return {
     github: values.VITE_AUTH_GITHUB_ENABLED !== 'false',
     email: values.VITE_AUTH_EMAIL_ENABLED !== 'false',
-    google: values.VITE_AUTH_GOOGLE_ENABLED === 'true',
+    google: values.VITE_AUTH_GOOGLE_ENABLED !== 'false',
   };
 }
 

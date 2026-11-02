@@ -41,11 +41,21 @@ afterEach(async () => {
 });
 
 describe('cloud save sign-in controls', () => {
-  it('shows enabled buttons in GitHub-then-email order and hides Google by default', async () => {
+  it('shows GitHub and Google before email by default', async () => {
     const node = await renderPanel();
     const buttons = [...node.querySelectorAll('button')].map((button) => button.textContent);
     expect(buttons.indexOf('Continue with GitHub')).toBeLessThan(buttons.indexOf('Send magic link'));
-    expect(buttons).not.toContain('Continue with Google');
+    expect(buttons.indexOf('Sign in with Google')).toBeGreaterThan(buttons.indexOf('Continue with GitHub'));
+    expect(buttons.indexOf('Sign in with Google')).toBeLessThan(buttons.indexOf('Send magic link'));
+  });
+
+  it('starts Google OAuth with the current origin and uses the shared error state', async () => {
+    mock.auth.signInWithOAuth.mockResolvedValueOnce({ error: { message: 'Unsupported provider: provider is not enabled' } });
+    const node = await renderPanel();
+    const googleButton = [...node.querySelectorAll('button')].find((button) => button.textContent === 'Sign in with Google');
+    await act(async () => googleButton.click());
+    expect(mock.auth.signInWithOAuth).toHaveBeenCalledWith({ provider: 'google', options: { redirectTo: window.location.origin } });
+    expect(node.textContent).toContain("Google sign-in isn't set up yet");
   });
 
   it('shows provider-disabled and email-rate-limit messages without raw provider payloads', async () => {
