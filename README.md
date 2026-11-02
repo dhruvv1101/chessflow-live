@@ -86,19 +86,25 @@ preparation files; this repository task does not deploy them.
 1. Import the existing `chessflow-live` repository as a Vite project.
 2. Use the repository root, `npm run build` and `dist` as the output directory.
 3. Add `GEMINI_API_KEY` as a server-only Vercel environment variable. Optionally
-   configure `GEMINI_MODEL` and `ALLOWED_ORIGINS`. The function defaults to the
-   production site origin when `ALLOWED_ORIGINS` is absent.
-   For Chess.com public-game imports, also add `CHESSCOM_CONTACT` as a
-   server-only variable before expecting the default proxy mode to respond.
-4. If you enable login enforcement with `COACH_REQUIRE_LOGIN`, also configure
+   configure `GEMINI_MODEL` and `ALLOWED_ORIGINS`. `ALLOWED_ORIGINS` is a
+   comma-separated list of browser origins in `https://host` form, with no path
+   or trailing slash. For example:
+   `https://chessflow-live.vercel.app,https://your-preview-domain.vercel.app`.
+   The default is the production site origin, so add the exact Vercel preview
+   origin when testing a preview deployment.
+4. For Chess.com public-game imports, add `CHESSCOM_CONTACT` as a server-only
+   Vercel variable. It is included in the proxy's User-Agent so Chess.com can
+   contact the operator; an example format is `maintainer@example.invalid`.
+   Do not use a `VITE_` prefix. Set this for Preview and Production as needed.
+5. If you enable login enforcement with `COACH_REQUIRE_LOGIN`, also configure
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project. These
    two Vite values are public browser configuration. Never use a service-role
    key in client code or this coach function.
-5. For cloud saves, follow [Supabase setup](docs/supabase-setup.md) and set the
+6. For cloud saves, follow [Supabase setup](docs/supabase-setup.md) and set the
    same two public Supabase variable names in Vercel.
    See [sign-in provider setup](docs/auth-setup.md) for GitHub OAuth, email
    magic links, provider switches and callback troubleshooting.
-6. Deploy from the Vercel dashboard when you choose. Redeploy after changing
+7. Deploy from the Vercel dashboard when you choose. Redeploy after changing
    function or Vite environment settings. This code change itself does not
    contact Vercel or deploy anything.
 
