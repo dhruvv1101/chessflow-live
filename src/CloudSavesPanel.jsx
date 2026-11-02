@@ -34,7 +34,7 @@ export default function CloudSavesPanel({ fen, pgn, onLoad }) {
 
   useEffect(() => {
     if (!supabase) { listLocalSaves().then(setSaves).catch(() => setSaves([])); return; }
-    if (!user) { setSaves([]); return; }
+    if (!user) { listLocalSaves().then(setSaves).catch(() => setSaves([])); return; }
     let active = true;
     supabase.from('saved_games').select('id,name,fen,pgn,updated_at').order('updated_at', { ascending: false }).then(({ data, error }) => {
       if (!active) return;
@@ -67,6 +67,7 @@ export default function CloudSavesPanel({ fen, pgn, onLoad }) {
       {providers.google && <button className="button button-outline" disabled={busy} onClick={() => signIn('Google')}>Continue with Google</button>}
       {providers.email && <><label className="setting-select">Email for magic link<input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com"/></label><button className="button button-outline" disabled={busy || !email} onClick={() => run('Email', () => supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.origin } }))}>Send magic link</button></>}
       {!providers.email && !providers.github && !providers.google && <p className="small-meta">Sign-in providers are disabled.</p>}
+      {saves.length > 0 && <><p className="small-meta">Saved in this browser</p><div className="cloud-save-list">{saves.map((save) => <button className="button button-outline" key={save.id} onClick={() => onLoad(save)}>{save.name} · {new Date(save.updated_at).toLocaleDateString()}</button>)}</div></>}
     </> : <>
       <p className="small-meta" data-testid="signed-in-account">Signed in as {user.email || user.user_metadata?.name || user.id}</p>
       <button className="button button-yellow" disabled={busy} onClick={() => run('Save', async () => { const { error } = await supabase.from('saved_games').insert({ name: `Game ${new Date().toLocaleString()}`, fen, pgn }); if (error) throw error; const { data, error: readError } = await supabase.from('saved_games').select('id,name,fen,pgn,updated_at').order('updated_at', { ascending: false }); if (readError) throw readError; setSaves(data || []); setMessage('Game saved to your account.'); return {}; })}>Save current game</button>

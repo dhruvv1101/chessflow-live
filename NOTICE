@@ -9,3 +9,5 @@ The JavaScript and WASM engine files are copied unmodified to public/engine/ by 
 The original flat chess-piece SVG artwork in src/pieces.jsx was created for ChessFlow Live and is licensed under GPL-3.0-only with this project. No third-party chess-piece assets are used.
 
 Chess opening data in data/openings/*.tsv is from lichess-org/chess-openings (default branch master). As a collection of facts the dataset is public domain; insofar as copyright applies, it is released under CC0 1.0 Universal. Source: https://github.com/lichess-org/chess-openings
+
+Chess.com import reads public games from the Chess.com Published-Data API by username. ChessFlow Live is not affiliated with Chess.com. API terms: https://www.chess.com/legal/user-agreement

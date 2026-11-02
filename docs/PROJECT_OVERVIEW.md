@@ -4,7 +4,7 @@
 
 ## 1. Executive summary
 
-**VERIFIED.** ChessFlow Live is a browser chess app for casual players who want to play Stockfish, ask for candidate moves, review one completed PGN, or play pass-and-play locally. Chess legality and the main engine run in the browser. A new Vercel Node function can explain already-computed Stockfish facts with Gemini; the function has mocked tests, but no Vercel deployment or live Gemini call was performed. The native FastAPI/Stockfish Docker service remains local-only; no hosted engine server exists. Supabase client support is in source, but no project was accessed. Evidence: `src/App.jsx` (`requestHint`, `importFinishedPgn`, `explainMove`), `src/engine.js`, `api/coach.js`, `server/app.py`.
+**VERIFIED.** ChessFlow Live is a browser chess app for casual players who want to play Stockfish, review PGNs, practice mistakes, inspect known openings, or import public Chess.com games by username. Chess legality and browser Stockfish run on the visitor's device. Gemini explanations and Chess.com public-data requests use same-origin Vercel functions when deployed; neither function has been deployed or live-tested here. The native FastAPI/Stockfish Docker service remains local-only; no hosted engine server exists. Supabase client support is in source, but no project was accessed. Evidence: `src/App.jsx` (`requestHint`, `importFinishedPgn`, `explainMove`), `src/openings.js`, `src/chesscom.js`, `api/coach.js`, `api/chesscom.js`, `server/app.py`.
 
 | Feature | Status | Evidence |
 |---|---|---|
@@ -15,10 +15,12 @@
 | Future-moves line | Working | **VERIFIED:** `.future-box` in `DashboardLayout.jsx`; PV conversion in `src/engine/remoteEngine.js` and `src/engine.js`. |
 | Two-player mode | Working | **VERIFIED:** setup/clocks/draw/resign in `App.jsx`, `DashboardLayout.jsx`, `src/localGame.js`; `playwright/two-player.spec.js`. |
 | Undo / resign / draw | Working | **VERIFIED:** `undo`, resign/draw handlers in `App.jsx`; controls in `DashboardLayout.jsx`; tests in `playwright/two-player.spec.js`. Draw offer is local two-player only. |
-| PGN review | Partly working | **VERIFIED:** `importFinishedPgn` accepts one finished PGN, searches before/after each move and classifies evaluation loss. |
-| Import: PGN | Partly working | **VERIFIED:** paste one finished game in `DashboardLayout.jsx`; parser/review in `App.jsx`; no multi-game workflow evidenced. |
+| PGN review | Working | **VERIFIED:** `importFinishedPgn` in `src/App.jsx` accepts finished and in-progress PGNs, evaluates each recorded ply and classifies evaluation loss; `playwright/review-analysis.spec.js`. |
+| Import: PGN | Working | **VERIFIED:** one PGN at a time through the paste area; supports finished and `*` in-progress review. Multi-game PGN files are not supported. |
+| Import: Chess.com public games | Partly working | **VERIFIED:** `src/ChessComImportDialog.jsx`, `src/chesscom.js`, `api/chesscom.js`; mocked tests cover import/save/review/practice. Proxy requires server-only `CHESSCOM_CONTACT` on Vercel; no deployment was configured. Direct browser CORS probe returned HTTP 200 with readable JSON on 2026-11-02. |
 | Import: FEN / FEN list / SAN-UCI / Lichess URL | Not implemented | **VERIFIED:** no import UI/handler found in `src/` or tests; FEN is internal and used for saved-game loading. |
-| Export: PGN / FEN / JSON / SVG / PNG | Not implemented | **VERIFIED:** no export handlers/actions found in inspected source. |
+| Export: PGN | Working | **VERIFIED:** `src/pgn.js:buildGamePgn`, Copy PGN and Download .pgn actions in `src/DashboardLayout.jsx`; full current/practice game export. |
+| Export: FEN / JSON / SVG / PNG | Not implemented | **VERIFIED:** no respective export actions found in `src/` or tests. |
 | Pattern detection | Not implemented | **VERIFIED:** no detector/module/tests found. |
 | AI explanations | Partly working | **VERIFIED:** `api/coach.js` validates supplied facts and calls Gemini; `src/engine/coach.js` uses same-origin `/api/coach` by default and provides Stockfish fallback; `api/coach.test.js` mocks failure/success paths. Not deployed or live-tested. |
 | Saved games: IndexedDB | Working | **VERIFIED:** `src/cloud/savedGames.js` with localStorage fallback; `src/cloud/savedGames.test.js`; Settings UI. |
@@ -30,6 +32,7 @@
 | Gesture / camera mode | Partly working | **VERIFIED:** pointer/click/drag and keyboard board controls in `App.jsx`/`DashboardLayout.jsx`; no camera feature found. |
 | Native server engine | Partly working | **VERIFIED:** FastAPI/native engine and client router in `server/app.py`, `src/engine/remoteEngine.js`; live Playwright check is separate/opt-in; no hosted instance exists. |
 | Vercel coach function | Partly working | **VERIFIED:** `api/coach.js`, `vercel.json` (30s), `docs/coach.md`; `api/coach.test.js`; Vercel/Gemini runtime not contacted. |
+| Opening database | Working | **VERIFIED:** five official Lichess CC0 TSV files in `data/openings/`; `scripts/build-openings.mjs` produces `public/data/openings.json`; `src/openings.js` performs lazy lookup; `playwright/opening-database.spec.js`. |
 | Docker | Working by configuration; runtime not verified here | **VERIFIED:** `server/Dockerfile`, `scripts/engine-container.mjs`; daemon unavailable in this environment. |
 | CI | Working configuration; not run here | **VERIFIED:** `.github/workflows/server-ci.yml` runs server pytest + Docker build; `.github/workflows/client-ci.yml` runs npm install/lint/unit/build/deterministic Playwright. GitHub was not contacted. |
 | Hosting | Not deployed | **VERIFIED:** no cloud commands run; deployment files are preparation only; no hosted server verified. |
@@ -75,6 +78,17 @@ Size classes: small <10 KB, medium 10–100 KB, large >100 KB. “Role” identi
 | `public/engine/stockfish-19.js` | Full multi loader, medium | Generated/runtime | `src/engineAssets.js` |
 | `public/engine/stockfish-19.wasm` | Full multi WASM ~99 MB, large | Generated/runtime | Full worker |
 | `README.md` | local, Vercel, Docker instructions, small | Docs | no |
+| `NOTICE` | third-party engine, openings and Chess.com attribution, small | Legal/docs | no |
+| `data/openings/*.tsv` | five upstream CC0 opening source tables, medium collectively | Build input/docs | `scripts/build-openings.mjs` |
+| `public/data/openings.json` | generated position-to-opening lookup, large | Generated/runtime | fetched lazily by `src/openings.js` |
+| `scripts/build-openings.mjs`, test | validate/replay TSV rows and generate lookup, small | Build/test | npm build script |
+| `src/openings.js`, test | lazy opening lookup/classifier, small | Runtime/test | App/OpeningAnalysis |
+| `src/OpeningAnalysis.jsx` | named opening notes and theory exit, small | Runtime | Dashboard |
+| `src/chesscom.js`, test | public-data client, cache, filtering and username helpers, medium | Runtime/test | Chess.com dialog |
+| `src/ChessComImportDialog.jsx` | username import and public game list, medium | Runtime | Dashboard |
+| `api/chesscom.js`, test | allowlisted Vercel public API proxy, small | Runtime/test | same-origin browser requests |
+| `docs/chesscom-import.md` | setup, data flow, privacy and provider terms, small | Docs | no |
+| `playwright/chesscom-import.spec.js`, `opening-database.spec.js` | mocked Chess.com import and opening UI tests, small | Test | Playwright |
 | `scripts/copy-engine.mjs` | copies npm builds/license to public, small | Build/postinstall | npm postinstall |
 | `scripts/engine-container.mjs` | Docker operations wrapper, small | Operations | npm scripts |
 | `server/`, `server/tests/` | API/test dirs | Server/test | Docker/pytest |
@@ -127,11 +141,13 @@ Visitor browser (React static app)
   └─ optional fetch → FastAPI /analyze → native Stockfish in Docker
        └─ optional Supabase JS/session → saved_games table (not accessed)
 
-Vercel: static site/assets + same-origin Node coach function + isolation/cache headers (not deployed/queried)
+Vercel: static site/assets + same-origin Node coach and Chess.com functions + isolation/cache headers (not deployed/queried)
 GitHub Actions: push/PR/manual → server pytest + Docker build; no deploy
 ```
 
 **VERIFIED:** browser move/state/engine work is in `src/App.jsx`, `src/game.js`, `src/engine.js`; Vercel coach is in `api/coach.js`; local engine API/Docker is in `server/app.py`, `server/Dockerfile`; client and server CI workflows are under `.github/workflows/`. **INFERRED:** Vercel deployment is intended from README/config but was not checked. Browser chess runs on the visitor device; the Vercel function explains supplied facts only; native engine compute runs only where its Docker container is started. No Supabase, Vercel, Fly, Render or Google account was contacted. No hosted server exists.
+
+**VERIFIED:** `api/chesscom.js` is a GET-only Vercel proxy for public Chess.com archives/months and uses server-only `CHESSCOM_CONTACT`; the browser sends the username through this function in default proxy mode. The function and Gemini coach are source/config only; neither is deployed or queried here. Direct public API CORS probe was readable in Chromium (HTTP 200, JSON) on 2026-11-02. See `docs/chesscom-import.md`.
 
 ## 4. Request and data flows
 
@@ -155,14 +171,14 @@ GitHub Actions: push/PR/manual → server pytest + Docker build; no deploy
 5. `DashboardLayout.jsx` renders MultiPV table, Future Moves PV and engine name/depth/thread/hash/nodes/time. App and remote adapter discard stale work.
 6. **VERIFIED:** `src/engine/coach.js:analyzeCoachMove` posts structured review facts to same-origin `/api/coach` by default (or the explicit local override), adds a signed-in bearer token when available, and labels the provider. It does not depend on the native engine URL. `api/coach.js:validateRequest` checks FEN, played/best UCI, SAN and each variation sequentially with chess.js. Provider error, timeout, malformed output, quota response or missing key gives a Stockfish-only fallback. `sanitizeExplanation` removes sentences containing move tokens outside the validated engine move set. The fallback does not run a second engine search.
 
-### d) PGN review
-`App.jsx:importFinishedPgn` parses one PGN with `Chess.loadPgn`, requires a finished result, replays from initial/header FEN, searches before/after each move (Full, skill 20), and labels white-score loss thresholds: ≥2 pawn blunder, ≥1 mistake, ≥0.5 inaccuracy. `DashboardLayout.jsx` shows table; `EvaluationGraph.jsx` draws SVG. Short searches can fluctuate; these labels are not explanations.
+### d) PGN review and opening lookup
+`App.jsx:importFinishedPgn` parses one PGN with `Chess.loadPgn`, accepts a terminal result or `*`, replays from initial/header FEN, searches before/after each move (Full, skill 20), and labels white-score loss thresholds. `DashboardLayout.jsx` shows the table and opening card; `EvaluationGraph.jsx` draws SVG. `src/openings.js:classifyGame` replays SAN and matches positions by the first four FEN fields, so transpositions can match. Leaving known theory alone is never classified as a mistake.
 
 ### e) Save/load and sign-in
 Without a client, `CloudSavesPanel.jsx` calls `src/cloud/savedGames.js`, using IndexedDB database `chessflow-live`, object store `saved-games`, and localStorage fallback. With `VITE_SUPABASE_URL` plus `VITE_SUPABASE_ANON_KEY`, `src/cloud/supabase.js` creates the only Supabase client via `@supabase/supabase-js`. Panel offers magic link/GitHub, lists user rows, inserts name/FEN/PGN and loads a selected game. RLS/grants are the boundary. No live account/project test performed. No cloud update/delete UI; SQL migration only creates saved games.
 
 ### f) Import/export
-PGN paste leads to finished-game review; saved row load imports its FEN/PGN. No FEN-list, SAN/UCI, Lichess URL importer or PGN/FEN/JSON/SVG/PNG export handler was found.
+PGN paste or one selected Chess.com public game leads to the existing PGN review; the Chess.com entry is inside the paste/review area. Username/profile URL validation, serial archive/month fetching, conditional caches, variants, filters and pagination are in `src/chesscom.js` / `src/ChessComImportDialog.jsx`; the allowlisted proxy is `api/chesscom.js`. Copy/download PGN uses `src/pgn.js`. FEN-list, SAN/UCI and Lichess URL import plus FEN/JSON/SVG/PNG export remain absent.
 
 ### g) Two-player, undo, clocks, draw
 `App.jsx` handlers, `src/localGame.js`, and `DashboardLayout.jsx` implement names, orientation, legal alternating moves, optional hints, 5+0/10+0/15+10 clocks, increments, clock history/undo, draw accept/decline, resign and flag results. Playwright coverage: `playwright/two-player.spec.js`.
@@ -265,10 +281,12 @@ Visual checks used CSS fallback palette because the reference image was not acce
 | `playwright/settings.spec.js` | settings persistence, dialog/Escape/focus, layout. |
 | `playwright/theme-visual.spec.js` | theme screenshots to ignored test output, contrast, piece colors. |
 | `playwright/two-player.spec.js` | pass-and-play, persistence, clock/hints, draw/resign. |
+| `playwright/opening-database.spec.js` | known opening, theory exit, both themes, mobile/desktop overflow. |
+| `playwright/chesscom-import.spec.js` | mocked public-game import, save, review, user-perspective practice; optional live CORS probe. |
 | `db/tests/saved_games_rls.test.sql` | pgTAP row ownership assertions; not run. |
 | `server/tests/test_api.py` | API validation/CORS/FEN/body/rate/cap/proxy/busy/response; optional real engine. |
 
-**Final verification on 2026-11-02:** `npm.cmd run lint` PASS; `npm.cmd test` PASS, 12 files/52 tests; `npm.cmd run build` PASS, 142 modules, JS 582.19 kB minified (172.66 kB gzip), CSS 49.45 kB (9.12 kB gzip); existing >500 kB chunk warning remains. `npm.cmd run test:smoke -- --workers=1` PASS, 16 passed and 2 live-engine tests skipped (18 total). `python -m pytest -q` in `server/` PASS, 20 passed and 1 skipped with 5 dependency deprecation warnings. The skipped pytest is the optional real-engine test; no Docker engine was needed.
+**Prior verification snapshot:** `npm.cmd run lint` PASS; `npm.cmd test` PASS, 12 files/52 tests; `npm.cmd run build` PASS, 142 modules; deterministic Playwright 16 passed with 2 live-engine tests skipped; server pytest 20 passed with 1 optional real-engine test skipped. This is the earlier audit result; the final Part E verification results are recorded below after rerunning the full suite.
 
 **Smoke-test root causes and fixes:** previous engine-routing checks waited for live server identity without an available server response; the old fixture matched only one fixed local port and the live check was gated on the engine URL itself. The theme visual flow also asserted server identity, coupling screenshots to a running server. Default fixtures now mock `/health` and `/analyze` across hosts, default health is offline so ordinary tests use browser Stockfish, and live checks are isolated in `playwright/engine-routing.live.spec.js` behind explicit flags. Theme screenshots now go to ignored `test-results/`; the new layout screenshots use unique `docs/screenshots/` names. The review test now follows the actual Stockfish best move instead of assuming one fixed move.
 
@@ -280,10 +298,12 @@ Lint is ESLint 9 flat config with `no-undef`, `react/jsx-no-undef`, JS/JSX brows
 - **VERIFIED:** server validates Origin, request size, schema/ranges and FEN; serializes engine; per-IP and daily caps exist (`server/app.py`). Daily count resets at process restart and is per-instance, not a global quota. CORS middleware allows wildcard but application guard checks allowlist; origin is not authentication.
 - **VERIFIED:** PGN is parsed by chess.js and UI values rendered as React text; no `dangerouslySetInnerHTML` found. No explicit PGN size cap was found in review path. Stockfish WASM comes from pinned npm package/static assets; Gemini coach facts are sent only when requesting a coach explanation (`src/engine/coach.js`, `api/coach.js`).
 - **Data leaving device:** **VERIFIED from source:** browser-only chess calculations remain local. When requesting Gemini coaching, the browser sends supplied FEN, played/best move, validated engine lines/evaluations/PVs, and user level to same-origin `/api/coach` by default; Vercel forwards that structured prompt to Google. When configured for the optional local engine, hint/review requests send FEN/search settings to that server. Signed-in cloud saves send game fields and auth requests to Supabase. Hosting access logs were not examined.
+- **Chess.com import data:** **VERIFIED from source:** default proxy mode sends the entered username and archive/month requests through `api/chesscom.js` to Chess.com's public API. The proxy forwards public JSON to the browser and does not write games to server storage. The browser may cache immutable months in `sessionStorage`; it stores the last username in localStorage until Forget username is used. `CHESSCOM_CONTACT` is server-only. Direct mode sends requests from the browser instead.
 
 | Severity | Concrete risk |
 |---|---|
 | Medium | Coach/API abuse limits are in-memory/per-instance, not a global quota or billing guarantee (`api/coach.js`, `server/app.py`). No hosted coach deployment verified. |
+| Medium | Chess.com proxy throttle is best-effort per-IP and in-memory; serverless instances do not share a global quota (`api/chesscom.js`). Keep the contact setting configured and respect provider rate limits. |
 | Medium | An allowed-origin compromise can call API; CORS/Origin does not authenticate (`server/app.py`). |
 | Medium | Actual Supabase project settings/policies were not queried; SQL is owner-scoped but deployed state unverified. |
 | Medium | Full WASM builds each about 99 MB; mobile load, cache/bandwidth and hosting limits (`public/engine`, `src/engineAssets.js`). |
@@ -339,29 +359,30 @@ Vercel static deployment steps exist in `README.md`, but no hosting action occur
 
 | Priority | Work | Effort | Value | Risk |
 |---|---|---:|---|---|
-| 1 | Add and verify the Vercel environment configuration manually, then test coaching on the deployed site | S | High | Medium |
+| 1 | When ready, set server-only `CHESSCOM_CONTACT` in Vercel and deploy/redeploy; verify the proxy from the browser | S | High | Medium |
 | 2 | Add durable distributed abuse controls before exposing the coach broadly | M | High | Medium |
 | 3 | Implement PGN/FEN/JSON and image export plus backup tests | M | High | Low |
 | 4 | Add a Library page and cloud adapter integration tests | M | Medium | Medium |
 | 5 | Reduce engine asset load and main bundle size | M/L | High | Medium |
 | 6 | Implement supported pattern detection and personalized learning with engine evidence | L | Medium | Medium |
 
-**Do not do yet:** do not host the Docker engine or create Fly/Render resources; do not touch Vercel/Supabase/Google Cloud until you choose to configure them; do not treat in-memory limits as billing guarantees; do not put service-role keys in the browser; do not advertise missing export/pattern/Library workflows as implemented. The Gemini coach route exists in code but is not deployed or live-verified.
+**Do not do yet:** do not host the Docker engine or create Fly/Render resources; do not deploy or change any cloud settings until you choose to configure them; do not treat in-memory limits as billing guarantees; do not put service-role keys in the browser. Chess.com batch recurring-mistake analysis (optional E6), verified trap detection, multi-game PGN import, FEN-list/SAN-UCI/Lichess URL import, non-PGN export, Pattern detection and a separate Library page are still not built. The Gemini coach and Chess.com proxy functions exist in code but are not deployed or live-verified.
 
 ## Commands run and results
 
 | Command | Result |
 |---|---|
-| `git status --short --branch`, `git log -6 --oneline` | **VERIFIED:** inspected locally; final logical commits are reported in chat. No push. |
-| `npm.cmd run lint` | **PASS**, exit 0 after each implementation part and at final verification. |
-| `npm.cmd test` | **PASS:** 12 test files, 52 tests. |
-| `npm.cmd run build` | **PASS:** 142 modules; JS 582.19 kB / 172.66 kB gzip; CSS 49.45 kB / 9.12 kB gzip; >500 kB chunk warning. |
-| `npm.cmd run test:smoke -- --workers=1` with both live flags disabled | **PASS:** 16 passed, 2 live-engine tests skipped (18 total). Includes layout geometry, themes, move navigation, PGN review, coaching controls and two-player coverage. |
+| `git status --short --branch`, `git log -6 --oneline` | **VERIFIED:** inspected locally; Parts A–D are committed; Part E is committed after this verification. Existing untracked `docs/architecture-overview.svg` is user-owned and was left unstaged. No push. |
+| `npm.cmd run lint` | **PASS**, exit 0. |
+| `npm.cmd test` | **PASS:** 20 files, 100 tests. |
+| `npm.cmd run build` | **PASS:** regenerated 3,865 opening rows / 7,982 positions (1,185,107 bytes raw, 104,070 gzip), then Vite transformed 148 modules. JS 620.85 kB / 185.16 kB gzip; CSS 52.98 kB / 9.73 kB gzip. Existing >500 kB chunk warning remains. |
+| `npm.cmd run test:smoke -- --workers=1` | **PASS:** 20 passed, 3 skipped (23 total). Two optional live-engine tests and the opt-in direct-CORS probe are skipped by default. |
 | `python -m pytest -q` from `server/` | **PASS:** 20 passed, 1 optional real-engine test skipped; five dependency deprecation warnings. |
-| Official provider documentation lookup | **VERIFIED:** provider details are summarized in `docs/coach.md`; limits and model availability can change. |
-| Vercel, Supabase, Fly, Render, Google Cloud or live Gemini API commands | **Not run by instruction.** |
+| `$env:RUN_CHESSCOM_CORS_PROBE='true'; npm.cmd run test:smoke -- playwright/chesscom-import.spec.js -g 'direct Chess.com API CORS probe' --workers=1` | **PASS:** Chromium could read the public archives response, HTTP 200, `application/json; charset=utf-8` on 2026-11-02. |
+| `git restore -- docs/screenshots/layout-*.png` (explicit screenshot paths) | **PASS:** restored tracked layout screenshots overwritten by the existing smoke suite. |
+| Vercel, Supabase, Fly, Render, Google Cloud, live Gemini or remote CI commands | **Not run by instruction.** |
 
-The Vercel function max duration is set to 30 seconds. Official Vercel docs currently describe Hobby max duration up to 60 seconds without Fluid Compute and 300 seconds with it; check the project's current plan/config before relying on deployment. The current Gemini model list includes `gemini-3.5-flash-lite`; pricing docs list free-tier input/output but quotas and free-tier eligibility can change. These details are marked “verify before relying” in `docs/coach.md`. No hosted function, Google API call, Supabase project, Docker runtime or remote CI run was verified.
+The Vercel function max duration is set to 30 seconds. Official Vercel/Gemini limit notes in `docs/coach.md` are marked “verify before relying.” No hosted function, Google API call, Supabase project, Docker runtime or remote CI run was verified. For Chess.com proxy use, the remaining manual Vercel action is to set server-only `CHESSCOM_CONTACT` and then deploy/redeploy; it is intentionally not configured from this workspace.
 
 ## How the whole thing works
 

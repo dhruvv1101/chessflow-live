@@ -88,6 +88,8 @@ preparation files; this repository task does not deploy them.
 3. Add `GEMINI_API_KEY` as a server-only Vercel environment variable. Optionally
    configure `GEMINI_MODEL` and `ALLOWED_ORIGINS`. The function defaults to the
    production site origin when `ALLOWED_ORIGINS` is absent.
+   For Chess.com public-game imports, also add `CHESSCOM_CONTACT` as a
+   server-only variable before expecting the default proxy mode to respond.
 4. If you enable login enforcement with `COACH_REQUIRE_LOGIN`, also configure
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in the Vercel project. These
    two Vite values are public browser configuration. Never use a service-role
@@ -117,6 +119,14 @@ opening and where the game left the indexed line. That indication does not
 mean the move was bad, and the app does not infer traps from opening data.
 Training summaries are local and are not official Elo ratings.
 
+Use **Import from Chess.com** to read public games by username (not as a
+sign-in). It loads the newest month first and lets you fetch older months,
+filter the imported list, analyze PGNs and save through the existing game-save
+adapter. Set `CHESSCOM_CONTACT` as a server-only Vercel variable for the proxy;
+`VITE_CHESSCOM_MODE` optionally selects direct browser requests. See
+[docs/chesscom-import.md](docs/chesscom-import.md) for privacy, limits and
+provider-terms guidance.
+
 ## Environment variable names
 
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ENGINE_API_URL` (optional,
@@ -124,7 +134,8 @@ local engine only), `VITE_COACH_URL` (optional, local coach override),
 `GEMINI_API_KEY`, `GEMINI_MODEL`, `ALLOWED_ORIGINS`, `COACH_REQUIRE_LOGIN`,
 `VITE_AUTH_GITHUB_ENABLED`, `VITE_AUTH_EMAIL_ENABLED`,
 `VITE_AUTH_GOOGLE_ENABLED`, `RUN_LIVE_ENGINE_TESTS`,
-`RUN_LIVE_ENGINE_STOPPED_TESTS`.
+`RUN_LIVE_ENGINE_STOPPED_TESTS`, `CHESSCOM_CONTACT`,
+`VITE_CHESSCOM_MODE`.
 
 ## License
 
