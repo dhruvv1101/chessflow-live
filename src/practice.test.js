@@ -33,7 +33,7 @@ describe('practice state transitions', () => {
   });
   it('moves from find to play after a judged legal candidate is accepted', () => {
     const judgment = judgePracticeMove({ color: 'w', moveUci: 'e2e4', bestUci: 'e2e4', bestScore: { cp: 0 }, playedScore: { cp: 0 } });
-    expect(acceptPracticeMove(state, { uci: 'e2e4', san: 'e4', fen: 'after' }, judgment)).toMatchObject({ phase: 'play', history: ['e2e4'], sanHistory: ['e4'], foundBestFirstTry: true });
+    expect(acceptPracticeMove(state, { uci: 'e2e4', san: 'e4', fen: 'after' }, judgment)).toMatchObject({ phase: 'play', history: ['e2e4'], sanHistory: ['e4'], foundBestFirstTry: true, lastMoveFeedback: 'Best move!' });
   });
   it('keeps the original review state separate and preserves the complete starting FEN', () => {
     const fen = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';

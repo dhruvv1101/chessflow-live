@@ -40,19 +40,19 @@ export function retryPracticeMove(session) {
 }
 
 export function revealPracticeMove(session, { bestFen = session.startFen, bestSan = session.bestSan } = {}) {
-  return { ...session, phase: 'play', fen: bestFen, history: [session.bestUci], sanHistory: [bestSan], revealed: true, missed: true, foundBestFirstTry: false, bestSan };
+  return { ...session, phase: 'play', fen: bestFen, history: [session.bestUci], sanHistory: [bestSan], revealed: true, missed: true, foundBestFirstTry: false, bestSan, lastMoveFeedback: 'Best move revealed.' };
 }
 
 export function keepPracticeMove(session, move) {
-  return { ...session, phase: 'play', fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san], missed: true, foundBestFirstTry: false };
+  return { ...session, phase: 'play', fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san], missed: true, foundBestFirstTry: false, lastMoveFeedback: 'Move kept.' };
 }
 
 export function acceptPracticeMove(session, move, judgment) {
-  return { ...session, phase: 'play', fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san], foundBestFirstTry: judgment.kind === 'best' && session.attempts === 0 && session.hintsUsed === 0, missed: !judgment.accepted };
+  return { ...session, phase: 'play', fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san], foundBestFirstTry: judgment.kind === 'best' && session.attempts === 0 && session.hintsUsed === 0, missed: !judgment.accepted, lastMoveFeedback: judgment.label };
 }
 
 export function practiceMove(session, move) {
-  return { ...session, fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san] };
+  return { ...session, fen: move.fen, history: [...session.history, move.uci], sanHistory: [...(session.sanHistory || []), move.san], lastMoveFeedback: null };
 }
 
 export function captureReviewState({ selectedPly, scrollTop = 0 }) { return { selectedPly, scrollTop }; }

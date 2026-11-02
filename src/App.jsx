@@ -15,6 +15,9 @@ import { analyzeCoachMove, cacheCoachExplanation, coachCacheKey, getCachedCoachE
 import { recordPracticeResult, recordTrainingGame } from './training.js';
 import { buildGamePgn, resultForGame } from './pgn.js';
 import { acceptPracticeMove, captureReviewState, createPracticeSession, judgePracticeMove, keepPracticeMove, practiceMove, restoreReviewState, revealPracticeMove, retryPracticeMove } from './practice.js';
+import { supabase } from './cloud/supabase.js';
+import { saveLocalGame } from './cloud/savedGames.js';
+import { classifyGame, loadOpeningDatabase } from './openings.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -48,6 +51,8 @@ function App() {
   const [reviewState, setReviewState] = useState('idle');
   const [reviewProgress, setReviewProgress] = useState('');
   const [reviewGameInProgress, setReviewGameInProgress] = useState(false);
+  const [reviewPerspectiveColor, setReviewPerspectiveColor] = useState(null);
+  const [openingInfo, setOpeningInfo] = useState({ status: 'idle', opening: null });
   const [reviewTimeline, setReviewTimeline] = useState(null);
   const [selectedPly, setSelectedPly] = useState(null);
   const [replayPlaying, setReplayPlaying] = useState(false);
@@ -88,6 +93,15 @@ function App() {
   const isReviewTimeline = Boolean(reviewTimeline);
   const practiceTimeline = useMemo(() => practiceSession ? buildTimeline(practiceSession.startFen, practiceSession.sanHistory || []) : null, [practiceSession]);
   const visibleTimeline = practiceTimeline || timeline;
+  useEffect(() => {
+    let active = true;
+    if (!visibleTimeline.moves.length) { setOpeningInfo({ status: 'idle', opening: null }); return () => { active = false; }; }
+    setOpeningInfo({ status: 'loading', opening: null });
+    classifyGame(visibleTimeline.moves, { startFen: visibleTimeline.initialFen })
+      .then((opening) => { if (active) setOpeningInfo({ status: 'ready', opening }); })
+      .catch(() => { if (active) setOpeningInfo({ status: 'error', opening: null }); });
+    return () => { active = false; };
+  }, [visibleTimeline]);
   const visiblePly = practiceTimeline ? practiceSession.sanHistory?.length || 0 : Math.max(0, Math.min(timeline.moves.length, selectedPly ?? timeline.moves.length));
   const exportSource = useMemo(() => {
     if (practiceSession) {
@@ -488,7 +502,8 @@ function App() {
     const requestId = ++practiceRequestIdRef.current;
     const searchFen = practiceSession.fen;
     setPracticeBusy(true);
-    setPracticeFeedback('Stockfish is thinking…');
+    const acceptanceFeedback = practiceSession.lastMoveFeedback;
+    setPracticeFeedback(acceptanceFeedback ? `${acceptanceFeedback} Stockfish is thinking…` : 'Stockfish is thinking…');
     search(searchFen, { ...(DIFFICULTIES[practiceSession.difficulty] || config), multipv: 1, color: searchFen.split(' ')[1] }, 'play', positionIdRef.current)
       .then(({ best }) => {
         if (cancelled || requestId !== practiceRequestIdRef.current) return;
@@ -499,7 +514,7 @@ function App() {
         const terminal = getGameStatus(reply);
         if (terminal.kind === 'checkmate') markPracticeDone(next, terminal.winner === 'White' ? '1-0' : '0-1');
         else if (['stalemate', 'draw'].includes(terminal.kind)) markPracticeDone(next, '1/2-1/2');
-        else { setPracticeSession(next); setPracticeFeedback('Your move.'); }
+        else { setPracticeSession(next); setPracticeFeedback(acceptanceFeedback ? `${acceptanceFeedback} Stockfish replied ${move.san}. Your move.` : 'Your move.'); }
       })
       .catch((error) => { if (!cancelled && error.name !== 'AbortError') setPracticeFeedback(`Practice engine unavailable: ${error.message}`); })
       .finally(() => { if (!cancelled && requestId === practiceRequestIdRef.current) setPracticeBusy(false); });
@@ -522,6 +537,7 @@ function App() {
     startFenRef.current = chessRef.current.fen();
     setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false); setCoach({ state: 'idle', explanation: null, error: '' });
     setPracticeSession(null);
+    setReviewPerspectiveColor(null);
     setSideChoice(choice);
     setHuman(choice === 'random' ? (Math.random() < 0.5 ? 'w' : 'b') : choice);
     setResigned(false);
@@ -557,7 +573,7 @@ function App() {
     const normalized = { ...DEFAULT_LOCAL_OPTIONS, ...options, whiteName, blackName };
     const initialClocks = localClockStart(normalized.clock);
     const initial = makeLocalSnapshot(initialGame(), normalized, { w: initialClocks.w, b: initialClocks.b }, { w: 0, b: 0 });
-    chessRef.current = initialGame(); startFenRef.current = chessRef.current.fen(); setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false); setPracticeSession(null); setMode('local'); setLocalSession(initial); localSessionRef.current = initial;
+    chessRef.current = initialGame(); startFenRef.current = chessRef.current.fen(); setReviewTimeline(null); setSelectedPly(null); setReplayPlaying(false); setPracticeSession(null); setReviewPerspectiveColor(null); setMode('local'); setLocalSession(initial); localSessionRef.current = initial;
     writeLocalGame(initial); setSavedLocalGame(initial); setHuman('w'); setSideChoice('w'); setResigned(false); setResignedColor(null); setLocalOutcome(''); lastClockTickRef.current = Date.now();
     setThinking(false); setReviewRows([]); setReviewState('idle'); setHints({ w: null, b: null });
     setGameVersion((value) => value + 1); publishPosition();
@@ -780,7 +796,7 @@ function App() {
     setNotice('Last turn undone.');
   };
 
-  const importFinishedPgn = async (sourcePgn = pgn) => {
+  const importFinishedPgn = async (sourcePgn = pgn, { perspectiveColor = null } = {}) => {
     let parsed;
     try {
       parsed = new Chess();
@@ -791,6 +807,7 @@ function App() {
     practiceRequestIdRef.current += 1;
     setPracticeSession(null); setPracticeBusy(false); setPracticeFeedback('');
     setPgn(sourcePgn);
+    setReviewPerspectiveColor(perspectiveColor);
     setReviewGameInProgress(header.Result === '*' || !header.Result);
     const history = parsed.history();
     let review;
@@ -810,6 +827,7 @@ function App() {
     setLocalOutcome('');
     setThinking(true);
     try {
+      const openingDatabase = await loadOpeningDatabase().catch(() => null);
       const results = [];
       for (let index = 0; index < history.length; index += 1) {
         const played = review.moves[index];
@@ -845,6 +863,7 @@ function App() {
         const pieces = board.board().flat().filter(Boolean);
         const phase = pieces.length > 24 ? 'opening' : pieces.length > 12 ? 'middlegame' : 'endgame';
         const bestSan = legalVariation(before, [best?.move || best?.pv?.[0] || played.uci], 1).san[0] || '—';
+        const opening = openingDatabase ? await classifyGame(history.slice(0, index + 1), { database: openingDatabase, startFen: review.initialFen }) : null;
         const coachInput = {
           fen: after, previousFen: before, moveSan: played.san, moveUci: played.uci,
           bestUci: best?.move || best?.pv?.[0] || played.uci,
@@ -852,6 +871,7 @@ function App() {
           variations: variations.map((line) => ({ uci: line.uci, san: line.san, evaluation_cp_white: line.cp, evaluation_mate_white: line.mate, depth: line.depth, nodes: line.nodes })),
           punishmentVariations: punishmentVariations.map((line) => ({ uci: line.uci, san: line.san, evaluation_cp_white: line.cp, evaluation_mate_white: line.mate, depth: line.depth, nodes: line.nodes })),
           opponentResponse, sideToMove: played.color, gamePhase: phase, motifs, userLevel: difficulty, bestSan,
+          ...(opening ? { openingName: opening.name, openingEco: opening.eco, ...(opening.firstOutOfBookPly != null ? { bookExitPly: opening.firstOutOfBookPly } : {}) } : {}),
         };
         const row = { number: Math.floor(index / 2) + 1, ply: index + 1, color: played.color, san: played.san,
           uci: played.uci, fen: after, previousFen: before, eval: formatEvaluation(playedPosition || {}), lossCp,
@@ -859,14 +879,14 @@ function App() {
           bestSan, variations,
           opponentResponse, opponentSan: legalVariation(after, [opponentResponse], 1).san[0] || '—', pv: response?.pv || [],
           punishmentSan: punishmentVariations[0]?.san || [],
-          motifs, gamePhase: phase, coachInput, depth: Math.max(best?.depth || 0, playedPosition?.depth || 0) };
+          motifs, gamePhase: phase, coachInput, opening, depth: Math.max(best?.depth || 0, playedPosition?.depth || 0) };
         results.push(row);
         setReviewRows([...results]);
       }
       if (reviewRun !== reviewRunRef.current) return;
       recordTrainingGame(results, pgn);
       setReviewState('done');
-      setNotice(`Review complete: ${history.length} plies evaluated.${header.Result === '*' || !header.Result ? ' Game in progress.' : ''} Opening-book names are unavailable without an opening database.`);
+      setNotice(`Review complete: ${history.length} plies evaluated.${header.Result === '*' || !header.Result ? ' Game in progress.' : ''}`);
     } catch (error) {
       if (reviewRun !== reviewRunRef.current) return;
       setReviewState('failed');
@@ -914,6 +934,23 @@ function App() {
   const analyzeCurrentGame = () => {
     if (!exportSource.game.history().length) return;
     void importFinishedPgn(gamePgn);
+  };
+
+  const saveChessComGame = async (remoteGame) => {
+    const parsed = new Chess();
+    parsed.loadPgn(remoteGame.pgn);
+    const name = `Chess.com vs ${String(remoteGame.opponent?.username || 'opponent').slice(0, 60)}`;
+    const payload = { name, fen: parsed.fen(), pgn: remoteGame.pgn };
+    if (supabase) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        const { error } = await supabase.from('saved_games').insert(payload);
+        if (error) throw error;
+        return 'Game saved to your account.';
+      }
+    }
+    await saveLocalGame(payload);
+    return 'Game saved in this browser.';
   };
 
   const darkEffective = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia?.('(prefers-color-scheme: dark)').matches);
@@ -988,6 +1025,10 @@ function App() {
     options={options} moveListRef={moveListRef} moves={moves} startGame={startGame} setDifficulty={setDifficulty}
     requestHint={requestHint} undo={undo} setResigned={setResigned} setNotice={setNotice}
     importFinishedPgn={importFinishedPgn} promote={promote} setPromotion={setPromotion}
+    reviewPerspectiveColor={reviewPerspectiveColor}
+    openingInfo={openingInfo} timelineStartFen={visibleTimeline.initialFen}
+    onAnalyzeChessComGame={(sourcePgn, metadata) => { void importFinishedPgn(sourcePgn, { perspectiveColor: metadata.color === 'white' ? 'w' : metadata.color === 'black' ? 'b' : null }); }}
+    onSaveChessComGame={saveChessComGame}
     onBoardKeyDown={onBoardKeyDown} dragState={dragState}
     onBoardPointerDown={onBoardPointerDown} onBoardPointerMove={onBoardPointerMove}
     onBoardPointerUp={onBoardPointerUp} onBoardPointerCancel={onBoardPointerCancel} onBoardMouseLeave={onBoardMouseLeave}
