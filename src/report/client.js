@@ -7,7 +7,7 @@ function friendlyHttpError(status) {
   if (status === 404) return new Error('Chess.com user not found. Check the username and try again.');
   if (status === 429) return new Error('Chess.com is rate limiting requests. Wait a little before trying again.');
   if (status === 403) return new Error('Chess.com blocked this request. Try again later.');
-  if (status === 503) return new Error('Chess.com import is not configured on this server yet.');
+  if (status === 503) return new Error('Chess.com import is not configured: CHESSCOM_CONTACT is missing from this Vercel deployment. Set the server-only variable in this environment and redeploy.');
   if (status >= 500) return new Error('Chess.com is temporarily unavailable. Try again later.');
   return new Error('Chess.com returned an unexpected response.');
 }

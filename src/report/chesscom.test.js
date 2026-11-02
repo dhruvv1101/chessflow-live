@@ -69,4 +69,11 @@ describe('report Chess.com client', () => {
     const offline = createReportChessComClient({ fetchImpl: async () => { throw new TypeError('Failed to fetch'); } });
     await expect(offline.getArchives('test')).rejects.toThrow(/Could not reach Chess\.com/i);
   });
+
+  it('explains which deployment setting is missing when the proxy returns 503', async () => {
+    const unconfigured = createReportChessComClient({
+      fetchImpl: async () => new Response(JSON.stringify({ error: 'service_not_configured' }), { status: 503 }),
+    });
+    await expect(unconfigured.getArchives('test')).rejects.toThrow(/CHESSCOM_CONTACT.*deployment.*redeploy/i);
+  });
 });
