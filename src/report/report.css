@@ -1,0 +1,31 @@
+.report-page { min-height: 100dvh; }
+.report-topbar { justify-content: space-between; }
+.top-actions { position: relative; }
+.report-nav-entry { position: absolute; top: 50%; left: calc(100% + 24px); transform: translateY(-50%); }
+.report-hero { padding-bottom: 20px; }
+.report-import-card { max-width: 820px; margin-inline: auto; }
+.report-import-form { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+.report-import-form .setting-select { flex: 1 1 260px; min-width: 180px; }
+.report-username { width: 100%; min-height: 44px; padding: 9px 12px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); color: var(--text); box-shadow: var(--control-shadow); }
+.report-username::placeholder { color: var(--grey); }
+.report-progress { margin-top: 14px; padding: 12px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); box-shadow: var(--control-shadow); }
+.report-progress p { margin: 0 0 8px; font-size: 12px; font-weight: 850; }
+.report-progress progress { display: block; width: 100%; height: 14px; accent-color: var(--purple); }
+.report-message { margin: 14px 0 0; padding: 10px 12px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); box-shadow: var(--control-shadow); font-size: 12px; font-weight: 850; }
+.report-error { border-color: var(--pink); }
+.report-games-section { margin-top: 34px; }
+.report-game-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.report-game-card { min-width: 0; }
+.report-game-card h3, .report-empty h3 { margin: 5px 0; font-size: 17px; font-weight: 950; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.report-empty { padding: 22px; text-align: center; }
+.report-footer { margin-top: 38px; }
+@media (max-width: 560px) {
+  .top-actions .report-nav-entry { min-height: 34px; padding: 6px 7px; font-size: 9px; }
+  .report-import-form { align-items: stretch; }
+  .report-import-form .setting-select { flex-basis: 100%; }
+  .report-games-section .section-heading { align-items: start; }
+  .report-games-section .section-heading .button { max-width: 155px; }
+}
+@media (max-width: 860px) {
+  .report-nav-entry { position: static; transform: none; }
+}
