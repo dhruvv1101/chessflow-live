@@ -20,6 +20,19 @@ describe('Chess.com public game client', () => {
     expect(() => parseChessComUsername('name<script>')).toThrow();
   });
 
+  it('calls the default browser fetch with the global receiver', async () => {
+    const previousFetch = globalThis.fetch;
+    let receiver;
+    globalThis.fetch = function fetchWithReceiver(_url) {
+      receiver = this;
+      return Promise.resolve(response({ archives: [] }));
+    };
+    try {
+      await new ChessComClient().getArchives('User');
+      expect(receiver).toBe(globalThis);
+    } finally { globalThis.fetch = previousFetch; }
+  });
+
   it('detects colour and result from the requested user perspective', () => {
     expect(enrichChessComGame(standardGame(), 'dHrUv')).toMatchObject({ color: 'white', opponentName: 'Other', myResult: 'win', accuracy: 83, moveCount: 2 });
     expect(resultFromMyView(standardGame(), 'black')).toBe('loss');

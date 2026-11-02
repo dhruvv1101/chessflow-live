@@ -101,7 +101,7 @@ async function readJsonLimited(response, maxBytes = 3 * 1024 * 1024) {
 }
 
 export class ChessComClient {
-  constructor({ fetchImpl = globalThis.fetch, wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), timeoutMs = 10_000, retries = 2 } = {}) {
+  constructor({ fetchImpl = (...args) => globalThis.fetch(...args), wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), timeoutMs = 10_000, retries = 2 } = {}) {
     this.fetchImpl = fetchImpl; this.wait = wait; this.timeoutMs = timeoutMs; this.retries = retries; this.queue = Promise.resolve();
   }
 
