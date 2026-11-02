@@ -96,7 +96,7 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 .topbar { display: flex; min-height: 76px; justify-content: space-between; align-items: center; gap: 16px; border-bottom: var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 1000; letter-spacing: -.045em; }
 .brand b { margin-left: 3px; color: var(--purple); }
-.brand-mark, .footer-mark { display: grid; width: 38px; height: 38px; place-items: center; border: var(--line); border-radius: 12px; background: var(--cream); box-shadow: 3px 3px 0 var(--ink); font-size: 13px; font-weight: 1000; letter-spacing: -.08em; }
+.brand-mark, .footer-mark { display: block; width: 38px; height: 38px; flex: 0 0 auto; border-radius: 12px; object-fit: cover; }
 .top-actions { display: flex; align-items: center; gap: 14px; }
 .engine-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
 .server-status-chip { display: inline-flex; align-items: center; gap: 7px; width: fit-content; margin: 8px 0; padding: 7px 11px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: var(--surface); font-size: 12px; font-weight: 700; }
@@ -268,7 +268,7 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 
 .site-footer { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 32px; padding-top: 15px; border-top: var(--line); font-size: 10px; font-weight: 900; }
 .site-footer>span:first-child { display: inline-flex; align-items: center; gap: 8px; }
-.footer-mark { width: 26px; height: 26px; border-width: 2px; border-radius: 8px; box-shadow: 2px 2px 0 var(--ink); font-size: 9px; }
+.footer-mark { width: 26px; height: 26px; border-radius: 8px; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 
 @media (max-width: 860px) {
@@ -577,8 +577,6 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 }
 
 :root[data-effective-theme="dark"] .topbar { border-bottom: 1px solid var(--border); }
-:root[data-effective-theme="dark"] .brand-mark,
-:root[data-effective-theme="dark"] .footer-mark,
 :root[data-effective-theme="dark"] .engine-status-icon,
 :root[data-effective-theme="dark"] .button,
 :root[data-effective-theme="dark"] .option-button,
@@ -724,9 +722,6 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 :root[data-effective-theme="dark"] .promotion-choice { border-radius: 14px; background: var(--surface-2); color: var(--text); }
 :root[data-effective-theme="dark"] .piece-drag-overlay { filter: drop-shadow(0 5px 10px rgb(0 0 0 / 48%)); }
 :root[data-effective-theme="dark"] .site-footer { border-top: 1px solid var(--border); color: var(--muted); }
-:root[data-effective-theme="dark"] .brand-mark,
-:root[data-effective-theme="dark"] .footer-mark { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); box-shadow: var(--control-shadow); }
-
 :root[data-effective-theme="dark"] .settings-dialog::backdrop { background: rgb(0 0 0 / 76%); }
 :root[data-effective-theme="dark"] .settings-card { border-radius: var(--card-radius); background: var(--surface); box-shadow: 0 20px 60px rgb(0 0 0 / 62%); }
 :root[data-effective-theme="dark"] .settings-section { border-top: 1px solid var(--border); }

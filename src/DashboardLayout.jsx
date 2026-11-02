@@ -67,7 +67,7 @@ export default function DashboardLayout({
   return <main className="app-shell">
     <div className="background-shapes" aria-hidden="true"><span className="shape-circle"/><span className="shape-slab"/><span className="shape-block"/></div>
     <header className="topbar">
-      <a className="brand" href="#top" aria-label="ChessFlow Live home"><span className="brand-mark" aria-hidden="true">CF</span><span>CHESSFLOW <b>LIVE</b></span></a>
+      <a className="brand" href="#top" aria-label="ChessFlow Live home"><img className="brand-mark" src="/assets/chessflow-logo.png" alt=""/><span>CHESSFLOW <b>LIVE</b></span></a>
       <div className="top-actions"><span className={`engine-pill ${engineState}`}><span className="engine-status-icon" aria-hidden="true">{engineState === 'ready' ? '✓' : engineState === 'loading' ? '…' : '!'}</span><span>{engineLabel(engineState)}</span></span>{mode === 'local' && <button className="button button-outline ai-switch-button" aria-label="Switch to AI mode" onClick={() => startGame('w')}>AI mode</button>}<button className="button button-yellow top-new-game" onClick={startNewGame}><ActionIcon name="new"/>New game</button></div>
       <button className="button button-outline settings-button" aria-label="Settings" onClick={() => setSettingsOpen(true)}><ActionIcon name="settings"/><span>Settings</span></button>
     </header>
@@ -156,7 +156,7 @@ export default function DashboardLayout({
 
       </div>
     </div>
-    <footer className="site-footer"><span><span className="footer-mark" aria-hidden="true">CF</span> ChessFlow Live</span><span>Stockfish stays on your device</span></footer>
+    <footer className="site-footer"><span><img className="footer-mark" src="/assets/chessflow-logo.png" alt=""/> ChessFlow Live</span><span>Stockfish stays on your device</span></footer>
   </main>;
 }
 
