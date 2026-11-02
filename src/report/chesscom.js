@@ -64,18 +64,15 @@ export function parseReportPgn(game, username) {
   };
 }
 
-export function buildRecentGameSet(rawGames, username, { now = Date.now(), limits = FREE_LIMITS } = {}) {
+export function buildRecentGameSet(rawGames, username, { limits = FREE_LIMITS } = {}) {
   let skippedVariants = 0;
   let skippedInvalid = 0;
-  const dropped = { variants: 0, invalidPgn: 0, missingMetadata: 0, outsideDateRange: 0, duplicates: 0, overLimit: 0 };
-  const cutoff = now - limits.lookbackDays * 24 * 60 * 60 * 1000;
+  const dropped = { variants: 0, invalidPgn: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 };
   const byUrl = new Map();
   for (const raw of rawGames) {
     if (!raw || typeof raw !== 'object') { skippedInvalid += 1; dropped.invalidPgn += 1; continue; }
     if (raw.rules !== 'chess') { skippedVariants += 1; dropped.variants += 1; continue; }
     if (typeof raw.url !== 'string' || !raw.url || !Number.isFinite(Number(raw.end_time))) { dropped.missingMetadata += 1; continue; }
-    const endTime = Number(raw.end_time) * 1000;
-    if (endTime < cutoff || endTime > now + 60_000) { dropped.outsideDateRange += 1; continue; }
     if (byUrl.has(raw.url)) { dropped.duplicates += 1; continue; }
     try {
       const parsed = parseReportPgn(raw, username);

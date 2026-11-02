@@ -10,7 +10,8 @@ function formatDate(timestamp) {
 
 function formatImportSummary(result, limits) {
   const { dropped } = result;
-  return `Imported ${result.games.length} games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsInRange} in the last ${limits.lookbackDays} days, ${result.archiveMonthsFetched} fetched. ${result.gamesFetched} games checked. Dropped by reason: ${dropped.variants} variants, ${dropped.invalidPgn} unreadable PGNs, ${dropped.missingMetadata} missing game details, ${dropped.outsideDateRange} outside the date range, ${dropped.duplicates} duplicate games, ${dropped.overLimit} over the ${limits.maxGames}-game limit.`;
+  const empty = result.games.length === 0 && result.gamesFetched === 0 ? ' No games were listed in the fetched archives.' : '';
+  return `Imported ${result.games.length} of up to ${limits.maxGames} most recent standard games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsFetched} fetched, ${result.archiveMonthsNotFetched} not fetched after reaching the game limit. ${result.gamesFetched} games checked. Dropped by reason: ${dropped.variants} variants, ${dropped.invalidPgn} unreadable PGNs, ${dropped.missingMetadata} missing game details, ${dropped.duplicates} duplicate games, ${dropped.overLimit} beyond the ${limits.maxGames}-game limit.${empty}`;
 }
 
 export default function ReportPage() {
@@ -74,7 +75,7 @@ export default function ReportPage() {
     <section className="hero report-hero" aria-labelledby="report-title">
       <p className="eyebrow"><span className="eyebrow-square"/> YOUR GAMES. YOUR DATA.</p>
       <h1 id="report-title"><span>Game Report</span><span>Leak Trainer</span></h1>
-      <div className="hero-foot"><p>Import your public games for a private, on-device report and training plan.</p><p className="hero-status">Free tier: last {limits.lookbackDays} days · up to {limits.maxGames} games.</p></div>
+      <div className="hero-foot"><p>Import your public games for a private, on-device report and training plan.</p><p className="hero-status">Free tier: up to {limits.maxGames} most recent standard games.</p></div>
     </section>
 
     <section className="folder-card report-import-card" aria-labelledby="report-import-title">
@@ -88,7 +89,7 @@ export default function ReportPage() {
         <button className="button button-yellow" type="submit" disabled={busy}><span aria-hidden="true">↧</span>{busy ? 'Importing…' : 'Import games'}</button>
         {busy && <button className="button button-outline" type="button" onClick={cancelImport}>Cancel</button>}
       </form>
-      <p id="report-limits" className="small-meta">Only standard chess games from the last {limits.lookbackDays} days are kept, up to {limits.maxGames} games.</p>
+      <p id="report-limits" className="small-meta">Only standard chess games, the {limits.maxGames} most recent, are kept.</p>
       {progress && <div className="report-progress" role="status" aria-live="polite"><p>{progress.message}</p><progress aria-label="Import progress" max={Math.max(1, progress.total)} value={progress.completed}/></div>}
       {error && <p className="report-message report-error" role="alert">{error}</p>}
       {message && <p className="report-message" role="status" aria-live="polite">{message}</p>}

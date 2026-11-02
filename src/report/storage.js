@@ -28,7 +28,7 @@ export async function loadReportGames() {
   });
 }
 
-export async function saveReportGames(games, { lookbackDays = FREE_LIMITS.lookbackDays, maxGames = FREE_LIMITS.maxGames, now = Date.now() } = {}) {
+export async function saveReportGames(games, { maxGames = FREE_LIMITS.maxGames, now = Date.now() } = {}) {
   const database = await openDatabase();
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(GAME_STORE, 'readwrite');
@@ -39,7 +39,6 @@ export async function saveReportGames(games, { lookbackDays = FREE_LIMITS.lookba
       const byUrl = new Map(read.result.map((game) => [game.url, game]));
       for (const game of games) byUrl.set(game.url, { ...game, importedAt: now });
       result = [...byUrl.values()]
-        .filter((game) => game.endTime >= now - lookbackDays * 24 * 60 * 60 * 1000 && game.endTime <= now + 60_000)
         .sort((a, b) => b.endTime - a.endTime)
         .slice(0, maxGames);
       store.clear();

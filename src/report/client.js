@@ -29,14 +29,13 @@ function monthFromArchive(url) {
   return { year, month, key: `${year}/${String(month).padStart(2, '0')}` };
 }
 
-function includedMonths(archives, now, lookbackDays) {
-  const cutoff = new Date(now - lookbackDays * 24 * 60 * 60 * 1000);
-  const cutoffMonth = Date.UTC(cutoff.getUTCFullYear(), cutoff.getUTCMonth(), 1);
-  const currentMonth = Date.UTC(new Date(now).getUTCFullYear(), new Date(now).getUTCMonth(), 1);
-  return archives.map(monthFromArchive).filter((entry) => entry && Date.UTC(entry.year, entry.month - 1, 1) >= cutoffMonth && Date.UTC(entry.year, entry.month - 1, 1) <= currentMonth).sort((a, b) => b.year - a.year || b.month - a.month);
+function archiveMonths(archives) {
+  const unique = new Map();
+  for (const month of archives.map(monthFromArchive).filter(Boolean)) unique.set(month.key, month);
+  return [...unique.values()].sort((a, b) => b.year - a.year || b.month - a.month);
 }
 
-export function createReportChessComClient({ fetchImpl = (...args) => globalThis.fetch(...args), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), now = Date.now, timeoutMs = 10_000, retries = 2 } = {}) {
+export function createReportChessComClient({ fetchImpl = (...args) => globalThis.fetch(...args), sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)), timeoutMs = 10_000, retries = 2 } = {}) {
   const cache = new Map();
   let queue = Promise.resolve();
 
@@ -111,13 +110,13 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
         return data.games;
       });
     },
-    importRecentGames(username, { lookbackDays = FREE_LIMITS.lookbackDays, maxGames = FREE_LIMITS.maxGames, signal, onProgress = () => {} } = {}) {
+    importRecentGames(username, { maxGames = FREE_LIMITS.maxGames, signal, onProgress = () => {} } = {}) {
       const valid = parseReportUsername(username);
       return enqueue(async () => {
         onProgress({ stage: 'archives', completed: 0, total: 0, message: 'Finding your recent game archives…' });
         const data = await request({ username: valid, type: 'archives' }, signal);
         if (!Array.isArray(data?.archives) || data.archives.some((entry) => typeof entry !== 'string')) throw new Error('Chess.com returned malformed archive data.');
-        const months = includedMonths(data.archives, now(), lookbackDays);
+        const months = archiveMonths(data.archives);
         const rawGames = [];
         let skippedVariants = 0;
         let monthsFetched = 0;
@@ -135,17 +134,17 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
           }
           monthsFetched += 1;
           onProgress({ stage: 'games', completed: monthsFetched, total: months.length, message: `Loaded ${monthsFetched} of ${months.length} archives…` });
-          if (buildRecentGameSet(rawGames, valid, { now: now(), limits: { lookbackDays, maxGames } }).games.length >= maxGames) break;
+          if (buildRecentGameSet(rawGames, valid, { limits: { maxGames } }).games.length >= maxGames) break;
         }
-        const result = buildRecentGameSet(rawGames, valid, { now: now(), limits: { lookbackDays, maxGames } });
+        const result = buildRecentGameSet(rawGames, valid, { limits: { maxGames } });
         result.skippedVariants += skippedVariants;
         result.dropped.variants += skippedVariants;
         result.archiveMonthsFound = data.archives.length;
-        result.archiveMonthsInRange = months.length;
         result.archiveMonthsFetched = monthsFetched;
+        result.archiveMonthsNotFetched = Math.max(0, months.length - monthsFetched);
         result.gamesFetched = gamesFetched;
         result.monthsFetched = monthsFetched;
-        onProgress({ stage: 'done', completed: monthsFetched, total: months.length, message: `Imported ${result.games.length} recent games.` });
+        onProgress({ stage: 'done', completed: monthsFetched, total: months.length, message: `Imported ${result.games.length} of up to ${maxGames} most recent standard games.` });
         return result;
       });
     },

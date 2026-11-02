@@ -19,18 +19,16 @@ describe('report Chess.com import', () => {
     expect(parsed.moves[0]).toMatchObject({ san: 'e4', uci: 'e2e4', ply: 1 });
   });
 
-  it('keeps only recent standard games, deduplicates by URL, sorts newest first and caps the import', () => {
-    const now = Date.UTC(2026, 10, 3);
-    const recent = Math.floor((now - 2 * 86_400_000) / 1000);
-    const old = Math.floor((now - 31 * 86_400_000) / 1000);
+  it('keeps the 25 newest standard games and reports every dropped reason', () => {
     const game = (id, end_time, rules = 'chess') => ({ url: `https://chess.com/game/${id}`, pgn, rules, time_class: 'rapid', white: { username: 'TestPlayer' }, black: { username: 'Opponent' }, end_time });
-    const input = [game('a', recent), game('a', recent), game('old', old), game('variant', recent, 'chess960'), { ...game('invalid', recent), pgn: 'not a pgn' }, { ...game('missing', recent), url: '' }, ...Array.from({ length: 30 }, (_, index) => game(`new-${index}`, recent - index))];
-    const result = buildRecentGameSet(input, 'TestPlayer', { now, limits: { lookbackDays: 30, maxGames: 25 } });
+    const old = Math.floor(Date.UTC(2012, 0, 1) / 1000);
+    const input = [game('a', old), game('a', old), game('old', old - 1), game('variant', old, 'chess960'), { ...game('invalid', old), pgn: 'not a pgn' }, { ...game('missing', old), url: '' }, ...Array.from({ length: 30 }, (_, index) => game(`new-${index}`, old - 2 - index))];
+    const result = buildRecentGameSet(input, 'TestPlayer', { limits: { maxGames: 25 } });
     expect(result.games).toHaveLength(25);
     expect(new Set(result.games.map((entry) => entry.url)).size).toBe(25);
     expect(result.games[0].endTime).toBeGreaterThanOrEqual(result.games.at(-1).endTime);
     expect(result.skippedVariants).toBe(1);
-    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, missingMetadata: 1, outsideDateRange: 1, duplicates: 1, overLimit: 6 });
+    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, missingMetadata: 1, duplicates: 1, overLimit: 7 });
   });
 });
 
@@ -47,16 +45,54 @@ describe('report Chess.com client', () => {
       if (url.includes('month=10') && ++monthTenAttempts === 1) return new Response(JSON.stringify({ games: [] }), { headers: { etag: 'oct-v1' } });
       return new Response(null, { status: 304, headers: { etag: 'oct-v1' } });
     });
-    const client = createReportChessComClient({ fetchImpl, sleep: async () => {}, now: () => Date.UTC(2026, 10, 3) });
+    const client = createReportChessComClient({ fetchImpl, sleep: async () => {} });
     await client.getMonth('test', 2026, 10);
     calls.length = 0;
-    const imported = await client.importRecentGames('test', { maxGames: 25, lookbackDays: 30 });
+    const imported = await client.importRecentGames('test', { maxGames: 25 });
     expect(imported.games).toEqual([]);
-    expect(imported).toMatchObject({ archiveMonthsFound: 2, archiveMonthsInRange: 2, archiveMonthsFetched: 2, gamesFetched: 0 });
-    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, missingMetadata: 0, outsideDateRange: 0, duplicates: 0, overLimit: 0 });
+    expect(imported).toMatchObject({ archiveMonthsFound: 2, archiveMonthsFetched: 2, gamesFetched: 0 });
+    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 });
     expect(calls.map((url) => url.match(/month=\d+/)?.[0] || 'archives')).toEqual(['archives', 'month=11', 'month=11', 'month=10']);
     const octoberRequest = fetchImpl.mock.calls.at(-1)[1];
     expect(octoberRequest.headers['If-None-Match']).toBe('oct-v1');
+  });
+
+  it('fetches newest archive months until it has the 25 most recent games, including old games', async () => {
+    const archiveMonths = ['2026/11', '2026/10', '2026/09', '2026/08'];
+    const monthGames = new Map(archiveMonths.map((month, monthIndex) => [month, Array.from({ length: 10 }, (_, index) => {
+      const time = Date.UTC(2016, 11 - monthIndex, 10, 12, 9 - index);
+      const end_time = Math.floor(time / 1000);
+      return { url: `https://chess.com/game/${month}-${index}`, end_time, pgn, rules: 'chess', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } };
+    })]));
+    const fetchedMonths = [];
+    const fetchImpl = vi.fn(async (url) => {
+      if (url.includes('type=archives')) return new Response(JSON.stringify({ archives: archiveMonths.map((month) => `https://api.chess.com/pub/player/test/games/${month}`) }));
+      const query = new URLSearchParams(url.split('?')[1]);
+      const month = `${query.get('year')}/${query.get('month')}`;
+      fetchedMonths.push(month);
+      return new Response(JSON.stringify({ games: monthGames.get(month) }));
+    });
+    const client = createReportChessComClient({ fetchImpl });
+    const result = await client.importRecentGames('test', { maxGames: 25 });
+
+    expect(result.games).toHaveLength(25);
+    expect(result.games.map((game) => game.url)).toEqual([...monthGames.values()].flat().slice(0, 25).map((game) => game.url));
+    expect(fetchedMonths).toEqual(archiveMonths.slice(0, 3));
+    expect(result).toMatchObject({ archiveMonthsFound: 4, archiveMonthsFetched: 3, gamesFetched: 30 });
+    expect(result.dropped.overLimit).toBe(5);
+  });
+
+  it('returns all available games when the player only has older archives', async () => {
+    const oldGame = { url: 'https://chess.com/game/old', end_time: Math.floor(Date.UTC(2010, 0, 1) / 1000), pgn, rules: 'chess', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } };
+    const fetchImpl = vi.fn(async (url) => url.includes('type=archives')
+      ? new Response(JSON.stringify({ archives: ['https://api.chess.com/pub/player/test/games/2010/01'] }))
+      : new Response(JSON.stringify({ games: [oldGame] })));
+    const client = createReportChessComClient({ fetchImpl });
+    const result = await client.importRecentGames('test');
+
+    expect(result.games.map((game) => game.url)).toEqual([oldGame.url]);
+    expect(result.archiveMonthsFound).toBe(1);
+    expect(result.archiveMonthsFetched).toBe(1);
   });
 
   it('maps missing users, rate limits and offline failures to plain messages', async () => {
