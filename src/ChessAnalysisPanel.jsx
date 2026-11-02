@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 const badgeClass = (label) => `analysis-classification-${String(label || 'unrated').toLowerCase()}`;
 
-export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOpponentPlan, onShowBetterMove, onPractice }) {
+export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOpponentPlan, onShowBetterMove, onPractice, onSignIn }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   if (!row) return <section className="folder-card coach-panel"><p className="meta-line">MOVE COACH</p><h2>Choose a move to review</h2><p className="small-meta">Click a move or an evaluation-graph point to see its Stockfish analysis.</p></section>;
   const explanation = coach.explanation;
@@ -17,7 +17,7 @@ export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOppone
       <button className="button button-outline" onClick={() => { setDetailsOpen(true); onShowBetterMove(row); }}>Show Better Move</button>
       <button className="button button-outline" onClick={() => onPractice(row)} disabled={!severe}>Practice This Mistake</button>
     </div>
-    {coach.error && <p className="coach-fallback" role="status">{coach.error} Stockfish lines are shown below.</p>}
+    {coach.loginRequired ? <div className="coach-fallback" role="status"><p>Sign in to use the AI coach. Stockfish analysis is still available.</p><button className="button button-outline" onClick={onSignIn}>Sign in</button></div> : coach.error && <p className="coach-fallback" role="status">{coach.error} Stockfish lines are shown below.</p>}
     {explanation && <div className="coach-explanation" aria-live="polite">
       <section><h3>What happened?</h3><p>{explanation.what_happened}</p></section>
       <section><h3>Why was it a mistake?</h3><p>{explanation.why_bad}</p></section>

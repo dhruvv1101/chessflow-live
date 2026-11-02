@@ -43,6 +43,7 @@ describe('coach API client', () => {
     const result = await analyzeCoachMove(review, { fetchImpl: vi.fn().mockResolvedValue({ ok: false, status: 401, json: async () => ({ error: 'login_required' }) }), getAccessToken: async () => null });
     expect(result.provider).toBe('stockfish');
     expect(result.message).toMatch(/sign in/i);
+    expect(result.loginRequired).toBe(true);
   });
 
   it('keeps aborts visible to the caller for stale-request cancellation', async () => {

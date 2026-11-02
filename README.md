@@ -94,6 +94,8 @@ preparation files; this repository task does not deploy them.
    key in client code or this coach function.
 5. For cloud saves, follow [Supabase setup](docs/supabase-setup.md) and set the
    same two public Supabase variable names in Vercel.
+   See [sign-in provider setup](docs/auth-setup.md) for GitHub OAuth, email
+   magic links, provider switches and callback troubleshooting.
 6. Deploy from the Vercel dashboard when you choose. Redeploy after changing
    function or Vite environment settings. This code change itself does not
    contact Vercel or deploy anything.
@@ -118,7 +120,9 @@ not official Elo ratings.
 `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ENGINE_API_URL` (optional,
 local engine only), `VITE_COACH_URL` (optional, local coach override),
 `GEMINI_API_KEY`, `GEMINI_MODEL`, `ALLOWED_ORIGINS`, `COACH_REQUIRE_LOGIN`,
-`RUN_LIVE_ENGINE_TESTS`, `RUN_LIVE_ENGINE_STOPPED_TESTS`.
+`VITE_AUTH_GITHUB_ENABLED`, `VITE_AUTH_EMAIL_ENABLED`,
+`VITE_AUTH_GOOGLE_ENABLED`, `RUN_LIVE_ENGINE_TESTS`,
+`RUN_LIVE_ENGINE_STOPPED_TESTS`.
 
 ## License
 

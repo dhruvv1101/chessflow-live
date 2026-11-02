@@ -76,7 +76,7 @@ export async function analyzeCoachMove(review, { apiUrl = configuredApiUrl, fetc
   let body;
   try { body = await response.json(); } catch { return stockfishFallback(review, 'Coach service returned an unreadable response. Stockfish analysis is still available.'); }
   if (!response.ok) {
-    if (body?.error === 'login_required') return stockfishFallback(review, 'Sign in to use Gemini Coach. Stockfish analysis is still available.');
+    if (body?.error === 'login_required') return { ...stockfishFallback(review), loginRequired: true, message: 'Sign in to use the AI coach' };
     return stockfishFallback(review, 'Coach service is unavailable. Stockfish analysis is still available.');
   }
   if (!body?.explanation || typeof body.explanation.what_happened !== 'string') return stockfishFallback(review, 'Coach service returned an invalid explanation. Stockfish analysis is still available.');

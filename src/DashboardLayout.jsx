@@ -47,6 +47,14 @@ export default function DashboardLayout({
   React.useEffect(() => {
     if (copyFailurePgn && copyErrorArea) { copyErrorArea.focus(); copyErrorArea.select(); }
   }, [copyFailurePgn, copyErrorArea]);
+  React.useEffect(() => {
+    const openCloudSignIn = () => {
+      setSettingsOpen(true);
+      window.requestAnimationFrame(() => document.getElementById('cloud-saves-title')?.scrollIntoView({ block: 'nearest' }));
+    };
+    window.addEventListener('chessflow:open-cloud-sign-in', openCloudSignIn);
+    return () => window.removeEventListener('chessflow:open-cloud-sign-in', openCloudSignIn);
+  }, []);
   const activeLine = hints[sideToMove]?.lines?.[0];
   const gameOver = ['checkmate', 'stalemate', 'draw'].includes(status.kind) || resigned;
   const startNewGame = () => mode === 'local' ? startLocalGame(localSession.options) : startGame();
@@ -111,7 +119,7 @@ export default function DashboardLayout({
       {reviewRows.length > 0 && <div className="review-results">
         <PanelErrorBoundary panel="Evaluation graph"><EvaluationGraph rows={reviewRows} currentPly={currentPly} onSelectPly={onNavigate}/></PanelErrorBoundary>
         <section className="folder-card review-table-card"><div className="folder-tab tab-yellow" aria-hidden="true"/><div className="folder-head"><div className="icon-box icon-yellow" aria-hidden="true">#</div><div><p className="meta-line">MOVE BY MOVE</p><h2>Review notes</h2>{reviewGameInProgress && <span className="review-progress-label">Game in progress</span>}</div></div><p className="small-meta">{reviewState === 'done' ? 'Short before/after searches; evaluations stay from White’s view.' : reviewProgress}</p><div className="review-table-wrap"><table className="review-table"><thead><tr><th>#</th><th>Move</th><th>Eval</th><th>Review</th></tr></thead><tbody>{reviewRows.map((row) => <tr key={row.ply}><td>{row.number}</td><td>{sideName(row.color)} · {row.san}</td><td>{row.eval}</td><td><ReviewBadge label={row.label}/></td></tr>)}</tbody></table></div>{reviewState === 'failed' && <p className="error-copy" role="alert">Review stopped early. {notice}</p>}</section>
-        <ChessAnalysisPanel row={selectedReviewRow} coach={coach} onExplain={onExplainMove} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPractice={onPracticeMistake}/>
+        <ChessAnalysisPanel row={selectedReviewRow} coach={coach} onExplain={onExplainMove} onShowOpponentPlan={onShowOpponentPlan} onShowBetterMove={onShowBetterMove} onPractice={onPracticeMistake} onSignIn={() => window.dispatchEvent(new CustomEvent('chessflow:open-cloud-sign-in'))}/>
         <OpeningAnalysis moves={timelineMoves}/>
         <MistakeStatistics reviewedCount={reviewRows.length}/>
       </div>}
