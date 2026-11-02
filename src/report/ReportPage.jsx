@@ -8,6 +8,11 @@ function formatDate(timestamp) {
   return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
 }
 
+function formatImportSummary(result, limits) {
+  const { dropped } = result;
+  return `Imported ${result.games.length} games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsInRange} in the last ${limits.lookbackDays} days, ${result.archiveMonthsFetched} fetched. ${result.gamesFetched} games checked. Dropped by reason: ${dropped.variants} variants, ${dropped.invalidPgn} unreadable PGNs, ${dropped.missingMetadata} missing game details, ${dropped.outsideDateRange} outside the date range, ${dropped.duplicates} duplicate games, ${dropped.overLimit} over the ${limits.maxGames}-game limit.`;
+}
+
 export default function ReportPage() {
   const { limits } = useEntitlement();
   const [username, setUsername] = useState('');
@@ -42,7 +47,7 @@ export default function ReportPage() {
       });
       const stored = await saveReportGames(result.games, limits);
       setGames(stored);
-      setMessage(`Imported ${result.games.length} recent games.${result.skippedVariants ? ` Skipped ${result.skippedVariants} variant games.` : ''}${result.skippedInvalid ? ` Skipped ${result.skippedInvalid} unreadable games.` : ''}`);
+      setMessage(formatImportSummary(result, limits));
     } catch (failure) {
       setError(failure?.name === 'AbortError' ? 'Import cancelled.' : failure?.message || 'Could not import Chess.com games.');
     } finally {

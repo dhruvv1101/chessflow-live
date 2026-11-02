@@ -121,6 +121,7 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
         const rawGames = [];
         let skippedVariants = 0;
         let monthsFetched = 0;
+        let gamesFetched = 0;
         for (const month of months) {
           if (signal?.aborted) throw new DOMException('Import cancelled.', 'AbortError');
           onProgress({ stage: 'games', completed: monthsFetched, total: months.length, message: `Loading archive ${monthsFetched + 1} of ${months.length}…` });
@@ -128,6 +129,7 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
           if (!Array.isArray(monthly?.games)) throw new Error('Chess.com returned malformed monthly game data.');
           for (const game of monthly.games) {
             if (!game || typeof game.pgn !== 'string' || typeof game.rules !== 'string') throw new Error('Chess.com returned malformed game data.');
+            gamesFetched += 1;
             if (game.rules !== 'chess') { skippedVariants += 1; continue; }
             rawGames.push(game);
           }
@@ -137,6 +139,11 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
         }
         const result = buildRecentGameSet(rawGames, valid, { now: now(), limits: { lookbackDays, maxGames } });
         result.skippedVariants += skippedVariants;
+        result.dropped.variants += skippedVariants;
+        result.archiveMonthsFound = data.archives.length;
+        result.archiveMonthsInRange = months.length;
+        result.archiveMonthsFetched = monthsFetched;
+        result.gamesFetched = gamesFetched;
         result.monthsFetched = monthsFetched;
         onProgress({ stage: 'done', completed: monthsFetched, total: months.length, message: `Imported ${result.games.length} recent games.` });
         return result;

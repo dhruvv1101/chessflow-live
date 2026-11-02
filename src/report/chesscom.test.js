@@ -24,12 +24,13 @@ describe('report Chess.com import', () => {
     const recent = Math.floor((now - 2 * 86_400_000) / 1000);
     const old = Math.floor((now - 31 * 86_400_000) / 1000);
     const game = (id, end_time, rules = 'chess') => ({ url: `https://chess.com/game/${id}`, pgn, rules, time_class: 'rapid', white: { username: 'TestPlayer' }, black: { username: 'Opponent' }, end_time });
-    const input = [game('a', recent), game('a', recent), game('old', old), game('variant', recent, 'chess960'), ...Array.from({ length: 30 }, (_, index) => game(`new-${index}`, recent - index))];
+    const input = [game('a', recent), game('a', recent), game('old', old), game('variant', recent, 'chess960'), { ...game('invalid', recent), pgn: 'not a pgn' }, { ...game('missing', recent), url: '' }, ...Array.from({ length: 30 }, (_, index) => game(`new-${index}`, recent - index))];
     const result = buildRecentGameSet(input, 'TestPlayer', { now, limits: { lookbackDays: 30, maxGames: 25 } });
     expect(result.games).toHaveLength(25);
     expect(new Set(result.games.map((entry) => entry.url)).size).toBe(25);
     expect(result.games[0].endTime).toBeGreaterThanOrEqual(result.games.at(-1).endTime);
     expect(result.skippedVariants).toBe(1);
+    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, missingMetadata: 1, outsideDateRange: 1, duplicates: 1, overLimit: 6 });
   });
 });
 
@@ -51,7 +52,8 @@ describe('report Chess.com client', () => {
     calls.length = 0;
     const imported = await client.importRecentGames('test', { maxGames: 25, lookbackDays: 30 });
     expect(imported.games).toEqual([]);
-    expect(imported.monthsFetched).toBe(2);
+    expect(imported).toMatchObject({ archiveMonthsFound: 2, archiveMonthsInRange: 2, archiveMonthsFetched: 2, gamesFetched: 0 });
+    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, missingMetadata: 0, outsideDateRange: 0, duplicates: 0, overLimit: 0 });
     expect(calls.map((url) => url.match(/month=\d+/)?.[0] || 'archives')).toEqual(['archives', 'month=11', 'month=11', 'month=10']);
     const octoberRequest = fetchImpl.mock.calls.at(-1)[1];
     expect(octoberRequest.headers['If-None-Match']).toBe('oct-v1');
