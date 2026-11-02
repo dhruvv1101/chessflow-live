@@ -111,9 +111,11 @@ quota and model notes.
 Paste a finished PGN to analyze each move with Stockfish 19 Full. The move list,
 move navigation, keyboard controls and evaluation graph select historical
 positions without changing the underlying game. Loss thresholds are
-configurable in Settings. Opening names and trap claims are omitted when no
-verified opening database is available. Training summaries are local and are
-not official Elo ratings.
+configurable in Settings. The Lichess chess-openings CC0 dataset is compiled
+into a lazy-loaded position index; review shows the deepest matching named
+opening and where the game left the indexed line. That indication does not
+mean the move was bad, and the app does not infer traps from opening data.
+Training summaries are local and are not official Elo ratings.
 
 ## Environment variable names
 

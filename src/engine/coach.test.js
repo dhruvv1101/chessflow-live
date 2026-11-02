@@ -7,6 +7,7 @@ const review = { fen: 'after', previousFen: 'before', moveSan: 'Qh5', moveUci: '
   evaluationBefore: 25, evaluationAfter: -120, evaluationLoss: 145, userLevel: 'intermediate',
   variations: [{ uci: ['e2e4', 'e7e5'], san: ['e4', 'e5'], cp: 24 }],
   punishmentVariations: [{ uci: ['e7e5', 'g1f3'], san: ['e5', 'Nf3'] }], opponentResponse: 'e7e5', motifs: [] };
+const openingContext = { openingName: 'Ruy Lopez', openingEco: 'C60', bookExitPly: 17 };
 const goodResponse = { provider: 'gemini', model: 'gemini-3.5-flash-lite', fallback: false, flags: [], explanation: { what_happened: 'A queen move lost time.' } };
 
 describe('coach API client', () => {
@@ -54,5 +55,20 @@ describe('coach API client', () => {
   it('uses a stable content key so repeated move explanations can be cached', () => {
     expect(coachCacheKey(review, 'Stockfish 19', { movetime: 1500 })).toBe(coachCacheKey(review, 'Stockfish 19', { movetime: 1500 }));
     expect(coachCacheKey(review, 'Stockfish 19', { movetime: 1500 })).not.toBe(coachCacheKey({ ...review, moveUci: 'g1f3' }, 'Stockfish 19', { movetime: 1500 }));
+  });
+
+  it('sends validated opening labels and includes them in the cache key', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, json: async () => goodResponse });
+    const contextReview = { ...review, ...openingContext };
+    await analyzeCoachMove(contextReview, { fetchImpl, getAccessToken: async () => null });
+    expect(JSON.parse(fetchImpl.mock.calls[0][1].body)).toMatchObject({ opening_name: 'Ruy Lopez', opening_eco: 'C60', book_exit_ply: 17 });
+    expect(coachCacheKey(contextReview, 'Stockfish 19', {})).not.toBe(coachCacheKey(review, 'Stockfish 19', {}));
+  });
+
+  it('rejects malformed opening labels before sending the request', async () => {
+    const fetchImpl = vi.fn();
+    await expect(analyzeCoachMove({ ...review, openingEco: 'Z99' }, { fetchImpl, getAccessToken: async () => null })).rejects.toThrow('Invalid opening ECO code');
+    await expect(analyzeCoachMove({ ...review, bookExitPly: 501 }, { fetchImpl, getAccessToken: async () => null })).rejects.toThrow('Invalid opening book-exit ply');
+    expect(fetchImpl).not.toHaveBeenCalled();
   });
 });

@@ -2,14 +2,15 @@ import { useState } from 'react';
 
 const badgeClass = (label) => `analysis-classification-${String(label || 'unrated').toLowerCase()}`;
 
-export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOpponentPlan, onShowBetterMove, onPractice, onSignIn }) {
+export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOpponentPlan, onShowBetterMove, onPractice, onSignIn, perspectiveColor = null, openingInfo }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   if (!row) return <section className="folder-card coach-panel"><p className="meta-line">MOVE COACH</p><h2>Choose a move to review</h2><p className="small-meta">Click a move or an evaluation-graph point to see its Stockfish analysis.</p></section>;
   const explanation = coach.explanation;
   const severe = ['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label);
   return <section className="folder-card coach-panel" aria-labelledby="coach-panel-title">
-    <div className="folder-head"><div className="icon-box icon-purple" aria-hidden="true">AI</div><div><p className="meta-line">MOVE {row.number}{row.color === 'w' ? ' · WHITE' : ' · BLACK'}</p><h2 id="coach-panel-title">Chess coach</h2></div><span className={`analysis-classification ${badgeClass(row.label)}`}>{row.label}</span></div>
+    <div className="folder-head"><div className="icon-box icon-purple" aria-hidden="true">AI</div><div><p className="meta-line">MOVE {row.number}{perspectiveColor ? row.color === perspectiveColor ? ' · YOU' : ' · OPPONENT' : row.color === 'w' ? ' · WHITE' : ' · BLACK'}</p><h2 id="coach-panel-title">Chess coach</h2></div><span className={`analysis-classification ${badgeClass(row.label)}`}>{row.label}</span></div>
     <p className="coach-summary"><strong>{row.san}</strong> · evaluation loss <strong>{row.lossCp} cp</strong>{row.depth ? ` · depth ${row.depth}` : ''}</p>
+    {openingInfo?.opening && <p className="small-meta opening-live-label">Opening: {openingInfo.opening.eco} {openingInfo.opening.name}</p>}
     {coach.provider && <p className={`coach-provider ${coach.provider === 'gemini' ? 'is-gemini' : 'is-stockfish'}`} role="status">Coach: {coach.provider === 'gemini' ? 'Gemini' : 'Stockfish analysis only'}</p>}
     <div className="coach-actions">
       <button className="button button-yellow" onClick={onExplain} disabled={coach.state === 'loading'}>{coach.state === 'loading' ? 'Explaining…' : 'Explain This Move'}</button>
@@ -34,7 +35,7 @@ export default function ChessAnalysisPanel({ row, coach, onExplain, onShowOppone
       <p>Best move: <strong>{row.bestSan}</strong> · played: <strong>{row.san}</strong> · before {row.beforeEvalText || '—'} · after {row.eval}</p>
       <p><strong>Verified opponent continuation:</strong> {row.punishmentSan?.join(' ') || row.opponentSan || 'No continuation available.'}</p>
       <ol>{(row.variations || []).slice(0, 3).map((line, index) => <li key={`${line.uci?.[0]}-${index}`}><strong>{line.san?.[0] || '—'}</strong> {line.san?.slice(1, 6).join(' ')} <span>{line.cp == null ? '' : `${(line.cp / 100).toFixed(2)} White`}</span></li>)}</ol>
-      <p className="small-meta">Opening names and trap claims are omitted because no opening database is configured.</p>
+      {openingInfo?.opening && <p className="small-meta">Opening: {openingInfo.opening.eco} {openingInfo.opening.name}{openingInfo.opening.firstOutOfBookPly ? ` · left known theory at ply ${openingInfo.opening.firstOutOfBookPly}` : ''}</p>}
     </details>
   </section>;
 }

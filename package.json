@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "npm run build:openings && vite build",
+    "build:openings": "node scripts/build-openings.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",

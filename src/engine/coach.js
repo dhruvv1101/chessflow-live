@@ -33,7 +33,7 @@ async function defaultAccessToken() {
 }
 
 export function coachCacheKey(review, engineVersion, analysisSettings) {
-  return JSON.stringify([review.fen, review.previousFen, review.moveUci, review.userLevel, review.practice === true, engineVersion, analysisSettings]);
+  return JSON.stringify([review.fen, review.previousFen, review.moveUci, review.userLevel, review.practice === true, review.openingName, review.openingEco, review.bookExitPly, engineVersion, analysisSettings]);
 }
 
 export function getCachedCoachExplanation(key, storage = globalThis.localStorage) {
@@ -50,6 +50,9 @@ export function cacheCoachExplanation(key, explanation, storage = globalThis.loc
 
 export async function analyzeCoachMove(review, { apiUrl = configuredApiUrl, fetchImpl = globalThis.fetch, signal, getAccessToken = defaultAccessToken } = {}) {
   if (review.practice !== undefined && typeof review.practice !== 'boolean') throw new TypeError('Invalid practice context.');
+  if (review.openingName !== undefined && (typeof review.openingName !== 'string' || review.openingName.length > 120)) throw new TypeError('Invalid opening name.');
+  if (review.openingEco !== undefined && (typeof review.openingEco !== 'string' || !/^[A-E]\d{2}$/.test(review.openingEco))) throw new TypeError('Invalid opening ECO code.');
+  if (review.bookExitPly !== undefined && (!Number.isInteger(review.bookExitPly) || review.bookExitPly < 0 || review.bookExitPly > 500)) throw new TypeError('Invalid opening book-exit ply.');
   let token = null;
   try { token = await getAccessToken(); } catch { /* login is optional unless the server requires it */ }
   const headers = { 'Content-Type': 'application/json' };
@@ -67,6 +70,9 @@ export async function analyzeCoachMove(review, { apiUrl = configuredApiUrl, fetc
         opponent_response: review.opponentResponse, side_to_move: review.sideToMove,
         game_phase: review.gamePhase, motifs: review.motifs || [], user_level: review.userLevel || 'intermediate',
         ...(review.practice === true ? { practice: true } : {}),
+        ...(review.openingName !== undefined ? { opening_name: review.openingName } : {}),
+        ...(review.openingEco !== undefined ? { opening_eco: review.openingEco } : {}),
+        ...(review.bookExitPly !== undefined ? { book_exit_ply: review.bookExitPly } : {}),
       }),
     });
   } catch (error) {

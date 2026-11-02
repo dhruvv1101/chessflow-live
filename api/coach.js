@@ -12,6 +12,7 @@ const fields = new Set([
   'fen', 'previous_fen', 'move_san', 'move_uci', 'best_uci', 'evaluation_before', 'evaluation_after',
   'evaluation_loss', 'variations', 'punishment_variations', 'opponent_response', 'side_to_move',
   'game_phase', 'motifs', 'user_level', 'practice',
+  'opening_name', 'opening_eco', 'book_exit_ply',
 ]);
 const lineFields = new Set(['uci', 'san', 'evaluation_cp_white', 'evaluation_mate_white', 'depth', 'nodes']);
 const explanationFields = [
@@ -91,6 +92,9 @@ function validateRequest(body) {
   if (body.motifs !== undefined && (!Array.isArray(body.motifs) || body.motifs.length > 8 || body.motifs.some((motif) => typeof motif !== 'string' || motif.length > 50))) throw new Error('invalid_motifs');
   if (body.user_level !== undefined && !['beginner', 'intermediate', 'advanced', 'Easy', 'Medium', 'Hard', 'Max'].includes(body.user_level)) throw new Error('invalid_user_level');
   if (body.practice !== undefined && typeof body.practice !== 'boolean') throw new Error('invalid_practice_context');
+  if (body.opening_name !== undefined && (typeof body.opening_name !== 'string' || body.opening_name.length > 120)) throw new Error('invalid_opening_name');
+  if (body.opening_eco !== undefined && (typeof body.opening_eco !== 'string' || !/^[A-E]\d{2}$/.test(body.opening_eco))) throw new Error('invalid_opening_eco');
+  if (body.book_exit_ply !== undefined && (!Number.isInteger(body.book_exit_ply) || body.book_exit_ply < 0 || body.book_exit_ply > 500)) throw new Error('invalid_book_exit_ply');
   return { body, allowedSans, bestSan, playedSan: played.san };
 }
 
@@ -199,6 +203,7 @@ export function createCoachHandler({ env = process.env, fetchImpl = globalThis.f
     const prompt = [
       'Explain this chess move for the stated player level using ONLY the supplied Stockfish facts.',
       'Do not add, alter, or infer chess moves or variations. Tactical claims must be supported by the supplied motifs or legal engine lines.',
+      'The optional opening name, ECO code, and book-exit ply are labels only. Do not invent opening theory, traps, or claim that leaving the named line was a mistake.',
       'Return JSON only with keys: what_happened, why_bad, opponent_punishment, position_deterioration, punishment_line, tactical_idea, winning_plan, lesson, elo_tip.',
       'punishment_line must copy a prefix of a supplied punishment line exactly; if none exists, return an empty array.',
       'Each text field must be concise. Avoid SAN/UCI notation except for moves copied exactly from supplied facts.',

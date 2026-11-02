@@ -108,6 +108,13 @@ describe('Vercel coach function', () => {
     expect(unknown.statusCode).toBe(400);
   });
 
+  it('accepts bounded opening labels and rejects invalid labels', async () => {
+    const good = await invoke({ body: { ...validBody, opening_name: 'Ruy Lopez', opening_eco: 'C60', book_exit_ply: 17 }, fetchImpl: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: JSON.stringify(explanation) }] } }] }) }) });
+    const bad = await invoke({ body: { ...validBody, opening_eco: 'Z99' }, fetchImpl: vi.fn() });
+    expect(good.statusCode).toBe(200);
+    expect(bad.statusCode).toBe(400);
+  });
+
   it('rejects an Origin outside the configured allowlist', async () => {
     const result = await invoke({ headers: { origin: 'https://attacker.example' } });
     expect(result.statusCode).toBe(403);
