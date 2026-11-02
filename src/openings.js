@@ -23,6 +23,7 @@ export async function classifyGame(moves, { database, fetchImpl, startFen } = {}
   try { board = new Chess(startFen || undefined); } catch { return null; }
   let deepest = null;
   const sans = [];
+  let firstOutOfBookPly = null;
   for (const entry of list) {
     const san = typeof entry === 'string' ? entry : entry?.san;
     if (typeof san !== 'string') return null;
@@ -31,16 +32,18 @@ export async function classifyGame(moves, { database, fetchImpl, startFen } = {}
     sans.push(move.san);
     const found = book[positionKey(board.fen())];
     if (found && typeof found.eco === 'string' && typeof found.name === 'string') deepest = { ...found, actualPly: sans.length };
+    else if (deepest && firstOutOfBookPly == null) firstOutOfBookPly = sans.length;
   }
   if (!deepest) return null;
   const bookPly = deepest.actualPly;
-  const firstOutOfBookPly = bookPly < sans.length ? bookPly + 1 : null;
+  if (firstOutOfBookPly == null && bookPly < sans.length) firstOutOfBookPly = bookPly + 1;
+  const contiguousBookPly = firstOutOfBookPly == null ? bookPly : firstOutOfBookPly - 1;
   return {
     eco: deepest.eco, name: deepest.name, bookPly,
     firstOutOfBookPly,
-    lastBookMove: sans[bookPly - 1] || null,
+    lastBookMove: sans[contiguousBookPly - 1] || null,
     firstOutOfBookMove: firstOutOfBookPly ? sans[firstOutOfBookPly - 1] : null,
-    lineInBook: sans.slice(0, bookPly),
+    lineInBook: sans.slice(0, contiguousBookPly),
   };
 }
 

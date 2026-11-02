@@ -28,6 +28,12 @@ describe('opening database lookup', () => {
     expect(result).toMatchObject({ bookPly: 2, lastBookMove: 'e5', firstOutOfBookPly: 3, firstOutOfBookMove: 'a3', lineInBook: ['e4', 'e5'] });
   });
 
+  it('preserves the first theory exit even when a later transposition re-enters the book', async () => {
+    const book = compileOpeningRows([{ eco: 'A00', name: 'King’s Fianchetto', sans: ['Nf3', 'Nf6', 'g3', 'g6'] }]);
+    const result = await classifyGame(['Nf3', 'g6', 'g3', 'Nf6'], { database: book });
+    expect(result).toMatchObject({ bookPly: 4, firstOutOfBookPly: 2, lastBookMove: 'Nf3', firstOutOfBookMove: 'g6', lineInBook: ['Nf3'] });
+  });
+
   it('returns null for an unknown game and malformed move sequence', async () => {
     expect(await classifyGame(['a3', 'h6', 'a4'], { database: fixtureBook })).toBeNull();
     expect(await classifyGame(['e4', 'not a move'], { database: fixtureBook })).toBeNull();

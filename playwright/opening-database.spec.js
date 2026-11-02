@@ -2,6 +2,9 @@ import { test, expect } from './fixtures.js';
 import { Chess } from 'chess.js';
 
 test('shows a named opening and book exit for a reviewed game without layout overflow', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   const game = new Chess();
   const moves = ['e4', 'd5', 'exd5', 'Qxd5', 'Nc3', 'Qd8', 'Bb5+', 'Bd7', 'Bxd7+', 'Qxd7', 'Nf3', 'Nc6', 'd3', 'Nf6', 'Bg5', 'h6', 'Bh4', 'Nd4', 'Nxd4', 'Qxd4'];
   for (const san of moves) game.move(san);
@@ -31,4 +34,5 @@ test('shows a named opening and book exit for a reviewed game without layout ove
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
     }
   }
+  expect(errors).toEqual([]);
 });

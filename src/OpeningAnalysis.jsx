@@ -11,7 +11,7 @@ export default function OpeningAnalysis({ moves, startFen }) {
     return () => { active = false; };
   }, [moves, startFen]);
   const opening = state.opening;
-  const bookPlies = opening?.bookPly || 0;
+  const bookPlies = opening?.lineInBook?.length || 0;
   return <section className="folder-card opening-analysis" aria-labelledby="opening-analysis-title">
     <div className="folder-head"><div className="icon-box icon-peach" aria-hidden="true">O</div><div><p className="meta-line">OPENING PHASE</p><h2 id="opening-analysis-title">Opening notes</h2></div></div>
     {state.status === 'loading' && <p className="small-meta" role="status">Loading opening data…</p>}
