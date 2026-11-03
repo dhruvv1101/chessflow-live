@@ -28,6 +28,7 @@ export const FREE_LIMITS = Object.freeze({
   reportInsights: Object.freeze({
     minimumSampleGames: 2,
     lowConfidenceGames: 3,
+    initialTreeDepth: 10,
     maxExampleGames: 3,
     openingLeakExpectedScoreGap: 0.15,
     firstBigMistakeMinimumWinProbabilityLoss: 0.15,

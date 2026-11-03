@@ -18,6 +18,15 @@ function mean(values) {
   return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : null;
 }
 
+function opponentReplyNotation(row) {
+  if (!row.opponentResponseSan) return null;
+  const fenParts = String(row.fenAfter || '').split(/\s+/);
+  const fullmove = Number(fenParts[5]) || Number(row.fullmove) || Math.ceil((row.ply || 1) / 2);
+  const turn = fenParts[1];
+  if (turn !== 'w' && turn !== 'b') return row.opponentResponseSan;
+  return `${fullmove}${turn === 'b' ? '...' : '.'} ${row.opponentResponseSan}`;
+}
+
 export function hasEnoughUserMoves(game, minimumUserMoves = FREE_LIMITS.minimumUserMoves) {
   if (!game || !['white', 'black'].includes(game.userColor)) return false;
   const color = game.userColor === 'white' ? 'w' : 'b';
@@ -155,7 +164,10 @@ export function buildOpeningTree(games, rows, {
       const linkKey = `${previous.id}|${current.id}|${previous.row.playedUci}|${previous.row.opponentResponseUci || ''}`;
       if (!links.has(linkKey)) links.set(linkKey, {
         source: previous.id, target: current.id,
-        move: previous.row.playedSan, opponentReply: previous.row.opponentResponseSan || null,
+        move: previous.row.notation || previous.row.playedSan,
+        opponentReply: previous.row.opponentResponseSan || null,
+        opponentReplyNotation: opponentReplyNotation(previous.row),
+        opponentResponseUci: previous.row.opponentResponseUci || null,
         _gameIds: new Set(),
       });
       links.get(linkKey)._gameIds.add(previous.row.gameKey);
