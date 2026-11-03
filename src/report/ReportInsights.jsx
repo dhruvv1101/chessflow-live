@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { buildMoveExplanation } from './explanations.js';
 import RadialOpeningTree from './RadialOpeningTree.jsx';
 import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
+import { useLessonActions } from './LessonsFeature.jsx';
+import { normalizeLessonFen } from './lessonData.js';
 
 function formatChange(value) {
   if (!Number.isFinite(value)) return '—';
@@ -25,7 +27,8 @@ function ExplanationDetails({ explanation }) {
   </div>;
 }
 
-function LeakCard({ leak, onShowTree, onFilterGames }) {
+function LeakCard({ leak, games = [], onShowTree, onFilterGames }) {
+  const { lessons, openLesson } = useLessonActions();
   const [openExample, setOpenExample] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -44,6 +47,9 @@ function LeakCard({ leak, onShowTree, onFilterGames }) {
   };
 
   const firstExample = leak.examples?.[0];
+  const firstRow = firstExample?.row;
+  const firstGame = games.find((game) => game.url === firstExample?.gameId);
+  const hasLesson = Boolean(firstRow && lessons.some((lesson) => lesson.normalizedFen === normalizeLessonFen(firstRow.fenBefore) && (!lesson.playedMove || lesson.playedMove === firstRow.playedSan)));
 
   return <article className="folder-card report-insight-card">
     <p className="meta-line">{leak.kind.replaceAll('-', ' ').toUpperCase()}</p>
@@ -52,6 +58,7 @@ function LeakCard({ leak, onShowTree, onFilterGames }) {
     <div className="report-leak-actions">
       {firstExample && <button className="button button-outline" type="button" aria-expanded={openExample === `${firstExample.gameId}:${firstExample.ply}`} onClick={() => explain(firstExample)}>Explain</button>}
       <button className="button button-outline" type="button" onClick={() => { onShowTree(leak); onFilterGames(leak.examples.map((example) => example.gameId)); }}>Show on tree</button>
+      {firstExample && <button className="button button-outline" type="button" onClick={() => openLesson(firstRow, firstGame, { kind: 'leak', tags: [...(firstRow?.tacticTags || []).map((entry) => entry.kind), leak.id] })}>{hasLesson ? '▣ Lesson saved' : 'Save as lesson'}</button>}
     </div>
     {leak.lowConfidence && <span className="review-badge badge-peach report-confidence-badge">Low confidence · fewer than 3 games</span>}
     {leak.kind === 'conversion' && <p className="small-meta">Average lost-advantage swing: {formatChange(leak.averageSwing)}.</p>}
@@ -67,14 +74,14 @@ function LeakCard({ leak, onShowTree, onFilterGames }) {
         {openExample === key && <div className="report-insight-explanation-wrap">
           {loading && <p role="status">Loading engine line…</p>}
           {error && <p role="alert">{error}</p>}
-          {explanation && <ExplanationDetails explanation={explanation}/>}
+          {explanation && <><ExplanationDetails explanation={explanation}/><button className="button button-outline" type="button" onClick={() => openLesson(example.row, games.find((game) => game.url === example.gameId), { kind: 'move', tags: [...(example.row?.tacticTags || []).map((entry) => entry.kind), leak.id] })}>Save explanation as lesson</button></>}
         </div>}
       </li>;
     })}</ul>
   </article>;
 }
 
-export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, openingStatus = 'ready', leaksStatus = 'ready', onFilterGames = () => {} }) {
+export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, games = [], openingStatus = 'ready', leaksStatus = 'ready', onFilterGames = () => {} }) {
   const [highlightedPositionKeys, setHighlightedPositionKeys] = useState([]);
   const showLeakOnTree = (leak) => {
     const keys = leak.examples.map((example) => example.row?.positionKey || example.row?.fenBefore?.split(' ').slice(0, 4).join(' ')).filter(Boolean);
@@ -86,7 +93,7 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, tree
     return <section className="report-insight-section" aria-label={`${title} opening performance`}>
       <h4>{title}</h4>
       {items.length ? <div className="report-analysis-table-wrap folder-card report-opening-table-wrap"><table className="report-analysis-table report-opening-table">
-        <thead><tr><th scope="col">Opening</th><th scope="col">Games</th><th scope="col">W / D / L</th><th scope="col">Avg. win-probability change</th><th scope="col">Confidence</th></tr></thead>
+        <thead><tr><th scope="col">Opening</th><th scope="col">Games <ReportHelpTrigger label="What games means"/></th><th scope="col">W / D / L <ReportHelpTrigger label="What W D L means"/></th><th scope="col">Avg. win-probability change <ReportHelpTrigger label="What average win-probability change means"/></th><th scope="col">Confidence <ReportHelpTrigger label="What confidence means"/></th></tr></thead>
         <tbody>{items.map((opening) => <tr key={`${color}:${opening.eco}:${opening.name}`}>
           <th scope="row">{opening.eco} · {opening.name}</th><td>{opening.games}</td><td>{opening.wins} / {opening.draws} / {opening.losses}</td>
           <td>{formatChange(opening.averageWinProbabilityChange)}</td><td>{opening.lowConfidence ? <span className="review-badge badge-peach report-confidence-badge">Low confidence</span> : 'Good sample'}</td>
@@ -107,15 +114,15 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, tree
           </>}
     </section>
     <section className="report-insight-section" aria-labelledby="report-leaks-title">
-      <h3 id="report-leaks-title">Leaks</h3>
+      <h3 id="report-leaks-title">Leaks <ReportHelpTrigger label="How leaks are ranked"/></h3>
       {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Stockfish analysis is in progress…</p>
         : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Stockfish analysis failed. Your imported games are still saved; retry by refreshing this report.</p>
         : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
-          : leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak} onShowTree={showLeakOnTree} onFilterGames={onFilterGames}/>)}</div>
+          : leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak} games={games} onShowTree={showLeakOnTree} onFilterGames={onFilterGames}/>)}</div>
             : <p className="folder-card report-insight-empty">No recurring leaks yet. Patterns need at least two games.</p>}
     </section>
     <section className="report-insight-section" aria-labelledby="report-first-mistake-title">
-      <h3 id="report-first-mistake-title">First big mistake in lost games</h3>
+      <h3 id="report-first-mistake-title">First big mistake in lost games <ReportHelpTrigger label="How first big mistakes are counted"/></h3>
       {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Waiting for move analysis…</p>
         : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">First-mistake summary is unavailable until analysis completes.</p>
           : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>

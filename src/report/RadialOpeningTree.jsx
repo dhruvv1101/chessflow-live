@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEntitlement } from './useEntitlement.js';
 import { buildRadialLayout, fitRadialView, moveTreeSelection, treePathIds, visibleTreeTable } from './radialLayout.js';
 import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
+import { useLessonActions } from './LessonsFeature.jsx';
+import { normalizeLessonFen } from './lessonData.js';
 
 const PIECES = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 
@@ -44,6 +46,7 @@ function moveLabel(move) {
 
 export default function RadialOpeningTree({ tree, leaks = [], highlightedPositionKeys = [], status = 'ready', onShowGames, onSaveLesson }) {
   const { limits } = useEntitlement();
+  const { lessons, openLesson } = useLessonActions();
   const [color, setColor] = useState('white');
   const [maxDepth, setMaxDepth] = useState(limits.reportInsights.initialTreeDepth);
   const [showLowConfidence, setShowLowConfidence] = useState(false);
@@ -184,6 +187,7 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
   return <section className="report-tree-section" aria-labelledby="report-radial-tree-title" onKeyDown={(event) => { if (event.key === 'Escape' && selectedId) setSelectedId(null); }}>
     <div className="report-tree-heading"><div><p className="meta-line">POSITIONS FROM YOUR IMPORTED GAMES</p><h3 id="report-radial-tree-title">Opening tree</h3></div>
       {status === 'ready' && <div className="report-tree-side-toggle" role="group" aria-label="Tree side">
+        <ReportHelpTrigger label="How to use tree side and zoom controls"/>
         {['white', 'black'].map((side) => <button type="button" className={'button ' + (color === side ? 'button-yellow' : 'button-outline')} aria-pressed={color === side} onClick={() => switchSide(side)} key={side}>{side === 'white' ? 'White' : 'Black'}</button>)}
       </div>}
     </div>
@@ -194,7 +198,7 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
             <label className="setting-select">Visible depth <ReportHelpTrigger label="What visible depth means"/><input aria-label="Visible depth in plies" type="range" min="1" max="24" value={maxDepth} onChange={(event) => changeDepth(Number(event.target.value))}/><span>{maxDepth} plies</span></label>
             <label className="report-tree-check"><input type="checkbox" checked={showLowConfidence} onChange={(event) => { setShowLowConfidence(event.target.checked); setViews((current) => ({ ...current, [color]: null })); }}/> Show below-minimum lines <ReportHelpTrigger label="Why low-confidence lines are hidden"/></label>
             <button className="button button-outline" type="button" aria-pressed={tableView} onClick={() => setTableView((value) => !value)}>{tableView ? 'Radial view' : 'Table view'}</button>
-            {!tableView && <div className="report-tree-zoom" aria-label="Tree zoom controls"><button className="button button-outline" type="button" aria-label="Zoom in" onClick={() => adjustZoom(1.2)}>+</button><button className="button button-outline" type="button" aria-label="Zoom out" onClick={() => adjustZoom(1 / 1.2)}>−</button><button className="button button-outline" type="button" onClick={resetFit}>Reset (fit)</button></div>}
+            {!tableView && <div className="report-tree-zoom" aria-label="Tree zoom controls"><ReportHelpTrigger label="How to pan and zoom the tree"/><button className="button button-outline" type="button" aria-label="Zoom in" onClick={() => adjustZoom(1.2)}>+</button><button className="button button-outline" type="button" aria-label="Zoom out" onClick={() => adjustZoom(1 / 1.2)}>−</button><button className="button button-outline" type="button" onClick={resetFit}>Reset (fit)</button></div>}
           </div>
           <div className={'report-tree-view-layout' + (selected ? ' has-selection' : '')}>
           <div className="report-tree-card folder-card">
@@ -207,15 +211,17 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
                 {layout.nodes.map((node) => {
                   const isLeak = leaks.some((leak) => leak.examples && leak.examples.some((example) => example.row && (example.row.positionKey === node.positionKey || example.row.fenBefore && example.row.fenBefore.split(' ').slice(0, 4).join(' ') === node.positionKey)));
                   const isHighlighted = highlightedPositionKeys.includes(node.positionKey);
+                  const hasLesson = lessons.some((lesson) => lesson.normalizedFen === normalizeLessonFen(node.positionKey));
                   const isLabelled = node.tail || node.games >= labelThreshold;
                   const pathActive = pathIds.has(node.id);
                   const openLabel = !node.tail && node.openingChanged && node.openingName;
                   const classes = (node.lowConfidence ? ' is-low-confidence' : '') + (isLeak ? ' is-leak' : '') + (isHighlighted ? ' is-highlighted' : '') + (selectedId === node.id ? ' is-selected' : '');
-                  return <g key={node.id} className={'report-tree-node' + (pathIds.size && !pathActive ? ' is-dimmed' : '')} role="button" tabIndex={node.depth ? 0 : -1} data-tree-node={node.id} aria-label={describe(node)} aria-pressed={selectedId === node.id} onMouseEnter={() => setHoveredId(node.id)} onMouseLeave={() => setHoveredId(null)} onFocus={() => setHoveredId(node.id)} onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget)) setHoveredId(null); }} onClick={() => node.tail ? toggleTail(node.id) : setSelectedId(node.id)} onKeyDown={(event) => selectByKeyboard(event, node)}>
+                  return <g key={node.id} className={'report-tree-node' + (pathIds.size && !pathActive ? ' is-dimmed' : '')} role="button" tabIndex={node.depth ? 0 : -1} data-tree-node={node.id} aria-label={describe(node) + (hasLesson ? ', saved lesson' : '')} aria-pressed={selectedId === node.id} onMouseEnter={() => setHoveredId(node.id)} onMouseLeave={() => setHoveredId(null)} onFocus={() => setHoveredId(node.id)} onBlur={(event) => { if (!event.currentTarget.parentElement?.contains(event.relatedTarget)) setHoveredId(null); }} onClick={() => node.tail ? toggleTail(node.id) : setSelectedId(node.id)} onKeyDown={(event) => selectByKeyboard(event, node)}>
                     <circle cx={node.x} cy={node.y} r={node.radius} fill={node.fill} className={classes}/>
                     {isLabelled && <text x={node.x + node.radius + 4} y={node.y - 3} className="report-tree-label">{node.tail ? node.label : node.label || node.name}</text>}
                     {openLabel && <text x={node.x + node.radius + 4} y={node.y + 10} className="report-tree-opening-label">{(node.eco ? node.eco + ' · ' : '') + node.openingName}</text>}
                     {isLeak && <circle cx={node.x + node.radius * .72} cy={node.y - node.radius * .72} r="4" className="report-tree-leak-marker" aria-hidden="true"/>}
+                    {hasLesson && <text x={node.x - node.radius} y={node.y - node.radius - 3} className="report-tree-note-marker" aria-label="Saved lesson">▣</text>}
                     <title>{describe(node) + (node.openingName ? '; ' + node.openingName : '')}</title>
                   </g>;
                 })}
@@ -234,7 +240,7 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
             <p>Results: {selected.wins} wins, {selected.draws} draws and {selected.losses} losses.</p>
             {touchingLeaks.length > 0 && <div><strong>Related leaks</strong><ul>{touchingLeaks.map((leak) => <li key={leak.id}>{leak.title}</li>)}</ul></div>}
             <div><strong>Example games</strong><ul>{selected.exampleGameIds && selected.exampleGameIds.map((gameId) => <li key={gameId}><a href="#report-games-title" onClick={(event) => { event.preventDefault(); onShowGames && onShowGames(gameId); document.getElementById('report-games-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }}>Show game {gameId}</a></li>)}</ul></div>
-            {onSaveLesson && <button className="button button-outline" type="button" onClick={() => onSaveLesson({ kind: 'position', color, normalizedFen: selected.positionKey, openingName: selected.openingName, tags: ['opening-position'], sourceGameIds: selected.exampleGameIds || [] })}>Save as lesson</button>}
+            {(onSaveLesson || openLesson) && <button className="button button-outline" type="button" onClick={() => (onSaveLesson || openLesson)({ kind: 'position', color, normalizedFen: selected.positionKey, openingName: selected.openingName, openingKey: selected.positionKey, tags: ['opening-position'], sourceGameIds: selected.exampleGameIds || [] })}>Save as lesson</button>}
             <button className="button button-outline" type="button" disabled aria-describedby="report-training-next">Train this line</button><p id="report-training-next" className="small-meta">Training arrives in the next update.</p>
           </aside>}
           </div>

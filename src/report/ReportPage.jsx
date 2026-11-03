@@ -15,6 +15,7 @@ import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './
 import { detectLeaks } from './leaks.js';
 import { summarizeFirstBigMistakes } from './firstBigMistake.js';
 import { ReportHelpProvider } from './ReportHelpDrawer.jsx';
+import { LessonsProvider, LessonsSection } from './LessonsFeature.jsx';
 
 function countLabel(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -156,16 +157,18 @@ export default function ReportPage() {
     </details>
 
     <ReportFilters games={games} shownCount={filtered.games.length} value={filters} onChange={setFilters} loading={loading} error={storageError}/>
-    <ReportHelpProvider><ReportInsights
+    <ReportHelpProvider><LessonsProvider><ReportInsights
       leaks={insights?.leaks || []} openingRows={insights?.openingRows || []}
       tree={insights?.tree}
+      games={filtered.games}
       firstMistakes={insights?.firstMistakes || { gamesLost: 0, gamesWithFirstMistake: 0, entries: [] }}
       openingStatus={!filtered.games.length ? 'empty' : openingStatus === 'error' ? 'error' : openingStatus === 'ready' ? 'ready' : 'loading'}
       leaksStatus={!filtered.games.length ? 'empty' : analysisStatus === 'error' ? 'error' : !filtered.rows.length ? 'loading' : 'ready'}
       onFilterGames={setSelectedGameIds}
-    /></ReportHelpProvider>
-
+    />
+    <LessonsSection games={filtered.games} rows={insights?.analysisRows || []} leaks={insights?.leaks || []} analysisStatus={analysisStatus}/>
     <ReportGames games={filtered.games} totalGames={games.length} rows={insights?.analysisRows || []} analysisStatus={analysisStatus} loadingStorage={loading} storageError={storageError} busy={busy} selectedGameIds={selectedGameIds} onClearFilter={() => setSelectedGameIds(null)} onDelete={deleteImportedData}/>
+    </LessonsProvider></ReportHelpProvider>
 
     <footer className="site-footer report-footer"><span><img className="footer-mark" src="/assets/chessflow-logo.png" alt=""/> ChessFlow Live</span><span>Not affiliated with Chess.com.</span></footer>
   </main>;

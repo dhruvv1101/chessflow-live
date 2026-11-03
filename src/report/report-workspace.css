@@ -57,6 +57,21 @@
 .report-help-items article { min-width: 0; padding: 10px 12px; border: var(--line); border-radius: var(--card-radius); background: var(--surface-alt); }
 .report-help-items h3 { margin: 0 0 5px; font-size: 13px; }
 .report-help-items p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.5; }
+.report-lessons-section { margin-top: 22px; }
+.report-lessons-actions, .report-lesson-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.report-lesson-filters { margin: 12px 0; }
+.report-lesson-filters label, .report-lesson-editor label, .report-saved-lesson label { display: grid; min-width: min(100%, 150px); gap: 4px; color: var(--text); font-size: 11px; font-weight: 850; }
+.report-lesson-filters select, .report-lesson-editor textarea, .report-saved-lesson textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); color: var(--text); box-shadow: var(--control-shadow); }
+.report-lesson-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; padding: 0; list-style: none; }
+.report-lesson-list > li { min-width: 0; padding: 14px; }
+.report-saved-lesson { display: grid; align-content: start; gap: 8px; }
+.report-saved-lesson p { margin: 0; overflow-wrap: anywhere; }
+.report-lesson-editor { width: min(720px, 100%); max-height: min(88vh, 860px); overflow: auto; display: grid; gap: 11px; padding: 18px; color: var(--text); background: var(--surface); box-shadow: var(--card-shadow); }
+.report-lesson-editor textarea, .report-saved-lesson textarea { min-height: 64px; resize: vertical; }
+.report-lesson-editor button:focus-visible, .report-lessons-section button:focus-visible, .report-lessons-section select:focus-visible, .report-lessons-section textarea:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+.report-hidden-input, .report-screenreader { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.report-tree-note-marker, .report-eval-note-marker { fill: var(--text); font-size: 11px; font-weight: 950; paint-order: stroke fill; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.report-eval-note-marker { pointer-events: none; }
 .report-tree-legend { margin-top: 8px; padding: 8px 3px 2px; border-top: var(--line); color: var(--text); font-size: 10px; font-weight: 750; }
 .report-tree-legend summary { width: fit-content; cursor: pointer; }
 .report-tree-legend summary:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 3px; }

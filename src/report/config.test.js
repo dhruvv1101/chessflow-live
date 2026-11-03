@@ -23,7 +23,7 @@ describe('free report entitlement', () => {
       },
       phaseThresholds: { openingMaxFullmove: 10, openingMinMaterial: 50, endgameMaterialNoQueens: 32, endgameMaterialAnyQueen: 18 },
       reportInsights: { minimumSampleGames: 2, lowConfidenceGames: 3, goodSampleGames: 3, maxExampleGames: 3, openingLeakExpectedScoreGap: 0.15, firstBigMistakeMinimumWinProbabilityLoss: 0.15, timeLeakMinimumRateDifference: 0.15, timeLeakMinimumMoves: 3 },
-      topLeaks: 8, drillsPerDay: 5,
+      topLeaks: 8, drillsPerDay: 5, maxSavedLessons: 15, correctHandlingsToMaster: 3,
     });
     expect(FREE_LIMITS).not.toHaveProperty('lookbackDays');
     expect(useEntitlement()).toEqual({ tier: 'free', limits: FREE_LIMITS });

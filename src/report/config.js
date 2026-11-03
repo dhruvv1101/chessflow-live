@@ -38,4 +38,6 @@ export const FREE_LIMITS = Object.freeze({
   }),
   topLeaks: 8,
   drillsPerDay: 5,
+  maxSavedLessons: 15,
+  correctHandlingsToMaster: 3,
 });
