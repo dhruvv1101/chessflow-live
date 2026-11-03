@@ -184,12 +184,15 @@ export function createGameAnalyzer({
         }) : [];
         rows.push({
           gameKey: game.url, ply: move.ply,
+          positionKey: normalizeAnalysisFen(move.fenBefore).split(/\s+/).slice(0, 4).join(' '),
+          fenBefore: move.fenBefore, fenAfter: move.fenAfter,
           fullmove,
           notation: `${fullmove}${color === 'b' ? '...' : '.'} ${applied.san}`,
           userColor, moverColor, isUserMove,
           playedSan: applied.san, playedUci: move.uci,
           bestMoveUci: before.bestMoveUci, bestMoveSan: before.bestMoveSan,
           opponentResponseUci: after.bestMoveUci, opponentResponseSan: after.bestMoveSan,
+          opponentPrincipalVariationSan: after.pvSan,
           principalVariationUci: before.pvUci, principalVariationSan: before.pvSan,
           evaluationBefore: beforeEvaluation, evaluationAfter: afterEvaluation,
           evaluationLossCp: moveLoss.lossCp,

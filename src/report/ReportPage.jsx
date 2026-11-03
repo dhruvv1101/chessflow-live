@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './report.css';
 import { reportChessComClient } from './client.js';
 import { useEntitlement } from './useEntitlement.js';
 import { clearReportGames, loadReportGames, saveReportGames } from './storage.js';
 import { clearAnalysisCache } from './analysisCache.js';
 import AnalysisProgress from './AnalysisProgress.jsx';
+import ReportInsights from './ReportInsights.jsx';
+import { loadOpeningDatabase } from '../openings.js';
+import { buildOpeningTree, buildOpeningSummary } from './tree.js';
+import { detectLeaks } from './leaks.js';
+import { summarizeFirstBigMistakes } from './firstBigMistake.js';
 
 function formatDate(timestamp) {
   return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
@@ -24,6 +29,9 @@ export default function ReportPage() {
   const { limits } = useEntitlement();
   const [username, setUsername] = useState('');
   const [games, setGames] = useState([]);
+  const [analysisRows, setAnalysisRows] = useState([]);
+  const [openingDatabase, setOpeningDatabase] = useState(null);
+  const [openingStatus, setOpeningStatus] = useState('idle');
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -31,6 +39,8 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const controllerRef = useRef(null);
+
+  const handleAnalysisComplete = useCallback((rows) => setAnalysisRows(rows), []);
 
   useEffect(() => {
     let active = true;
@@ -40,10 +50,32 @@ export default function ReportPage() {
     return () => { active = false; controllerRef.current?.abort(); };
   }, []);
 
+  useEffect(() => {
+    if (!analysisRows.length || !games.length) return undefined;
+    let active = true;
+    setOpeningStatus('loading');
+    loadOpeningDatabase().then((database) => {
+      if (active) { setOpeningDatabase(database); setOpeningStatus('ready'); }
+    }).catch(() => { if (active) setOpeningStatus('error'); });
+    return () => { active = false; };
+  }, [analysisRows, games]);
+
+  const insights = useMemo(() => {
+    if (!analysisRows.length || !openingDatabase) return null;
+    const tree = buildOpeningTree(games, analysisRows, { database: openingDatabase, ...limits.reportInsights });
+    return {
+      tree,
+      openingRows: buildOpeningSummary(tree),
+      leaks: detectLeaks(games, analysisRows, { tree, topN: limits.topLeaks, ...limits.reportInsights }),
+      firstMistakes: summarizeFirstBigMistakes(games, analysisRows, limits.reportInsights),
+    };
+  }, [analysisRows, games, limits, openingDatabase]);
+
   const importGames = async (event) => {
     event.preventDefault();
     if (busy) return;
     setError(''); setMessage(''); setImportReasons([]); setProgress(null);
+    setAnalysisRows([]);
     const controller = new AbortController();
     controllerRef.current = controller;
     setBusy(true);
@@ -69,7 +101,7 @@ export default function ReportPage() {
 
   const deleteImportedData = async () => {
     setError(''); setMessage('');
-    try { await Promise.all([clearReportGames(), clearAnalysisCache()]); setGames([]); setMessage('Imported game data deleted from this browser.'); }
+    try { await Promise.all([clearReportGames(), clearAnalysisCache()]); setGames([]); setAnalysisRows([]); setMessage('Imported game data deleted from this browser.'); }
     catch { setError('Could not delete imported game data from this browser.'); }
   };
 
@@ -99,7 +131,7 @@ export default function ReportPage() {
       </form>
       <p id="report-limits" className="small-meta">Only standard chess games, the {limits.maxGames} most recent, are kept.</p>
       {progress && <div className="report-progress" role="status" aria-live="polite"><p>{progress.message}</p><progress aria-label="Import progress" max={Math.max(1, progress.total)} value={progress.completed}/></div>}
-      <AnalysisProgress games={games}/>
+      <AnalysisProgress games={games} onAnalysisComplete={handleAnalysisComplete}/>
       {error && <p className="report-message report-error" role="alert">{error}</p>}
       {message && <p className="report-message" role="status" aria-live="polite">{message}</p>}
       {importReasons.length > 0 && <details className="report-message">
@@ -107,6 +139,10 @@ export default function ReportPage() {
         <ul>{importReasons.map((entry, index) => <li key={`${entry.url}-${index}`}>{entry.url || `Game ${index + 1}`}: {entry.reason}</li>)}</ul>
       </details>}
     </section>
+
+    {openingStatus === 'loading' && analysisRows.length > 0 && <p className="folder-card report-insight-empty" role="status">Loading the bundled opening names…</p>}
+    {openingStatus === 'error' && analysisRows.length > 0 && <p className="folder-card report-insight-empty" role="alert">Opening names could not be loaded; local move analysis is still available.</p>}
+    {insights && <ReportInsights leaks={insights.leaks} openingRows={insights.openingRows} firstMistakes={insights.firstMistakes}/>}
 
     <section className="report-games-section" aria-labelledby="report-games-title">
       <div className="section-heading"><div><p className="meta-line">SAVED ON THIS DEVICE</p><h2 id="report-games-title">Imported games</h2></div><button className="button button-outline" type="button" onClick={deleteImportedData} disabled={busy || !games.length}>Delete my imported data</button></div>

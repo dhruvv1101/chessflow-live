@@ -13,7 +13,7 @@ function formatElapsed(milliseconds = 0) {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-export default function AnalysisProgress({ games }) {
+export default function AnalysisProgress({ games, onAnalysisComplete }) {
   const sessionRef = useRef(null);
   const gamesRef = useRef(games);
   const activeRef = useRef(true);
@@ -28,16 +28,19 @@ export default function AnalysisProgress({ games }) {
     session.analyzeGames(gameList, { onProgress: (progress) => {
       if (activeRef.current && sessionRef.current === session) setState((current) => ({ ...current, ...progressState(progress) }));
     } }).then((rows) => {
-      if (activeRef.current && sessionRef.current === session) setState((current) => ({
-        ...current, status: 'complete', rows: rows.length, results: rows, completed: rows.length, total: rows.length,
-        elapsedMs: (current.elapsedMs || 0) + performance.now() - startedAt,
-      }));
+      if (activeRef.current && sessionRef.current === session) {
+        onAnalysisComplete?.(rows);
+        setState((current) => ({
+          ...current, status: 'complete', rows: rows.length, results: rows, completed: rows.length, total: rows.length,
+          elapsedMs: (current.elapsedMs || 0) + performance.now() - startedAt,
+        }));
+      }
     }).catch((error) => {
       if (!activeRef.current || sessionRef.current !== session) return;
       if (error?.name === 'AbortError') setState((current) => ({ ...current, status: 'cancelled', elapsedMs: (current.elapsedMs || 0) + performance.now() - startedAt }));
       else setState((current) => ({ ...current, status: 'error', error: error?.message || 'Could not analyze imported games.' }));
     });
-  }, []);
+  }, [onAnalysisComplete]);
 
   useEffect(() => subscribeLiveGameActive(setLiveGameActive), []);
 

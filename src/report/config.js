@@ -22,6 +22,13 @@ export const FREE_LIMITS = Object.freeze({
     endgameMaterialNoQueens: 32,
     endgameMaterialAnyQueen: 18,
   }),
+  reportInsights: Object.freeze({
+    minimumSampleGames: 2,
+    lowConfidenceGames: 3,
+    maxExampleGames: 3,
+    openingLeakExpectedScoreGap: 0.15,
+    firstBigMistakeMinimumWinProbabilityLoss: 0.15,
+  }),
   topLeaks: 3,
   drillsPerDay: 5,
 });
