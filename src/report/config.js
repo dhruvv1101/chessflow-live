@@ -37,7 +37,7 @@ export const FREE_LIMITS = Object.freeze({
     timeLeakMinimumMoves: 3,
   }),
   topLeaks: 3,
-  trainingEnabled: false,
+  trainingEnabled: true,
   drillsPerDay: 5,
   maxSavedLessons: 15,
   correctHandlingsToMaster: 3,

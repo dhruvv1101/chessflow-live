@@ -13,7 +13,7 @@ test('save, edit, export, import and delete a local report lesson', async ({ pag
         if (this.native) return this.native.postMessage(message);
         if (message === 'uci') queueMicrotask(() => { this.onmessage?.({ data: 'id name Stockfish Lesson Test' }); this.onmessage?.({ data: 'uciok' }); });
         else if (message === 'isready') queueMicrotask(() => this.onmessage?.({ data: 'readyok' }));
-        else if (String(message).startsWith('go depth')) {
+        else if (String(message).startsWith('go ')) {
           const best = this.fen?.split(' ')[1] === 'b' ? 'e7e5' : 'g1f3';
           queueMicrotask(() => { this.onmessage?.({ data: 'info depth 10 score cp 20 nodes 100 pv ' + best }); this.onmessage?.({ data: 'bestmove ' + best }); });
         }
@@ -40,7 +40,6 @@ test('save, edit, export, import and delete a local report lesson', async ({ pag
   await editor.getByLabel('My note').fill('Check the center first.');
   await editor.getByRole('button', { name: 'Save lesson' }).click();
   await expect(page.getByRole('heading', { name: 'Saved lessons (1/15)' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Practice this' })).toHaveCount(0);
   const downloadWait = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export lessons' }).click();
   const download = await downloadWait;
@@ -59,4 +58,6 @@ test('save, edit, export, import and delete a local report lesson', async ({ pag
   await expect(page.getByRole('heading', { name: 'Saved lessons (1/15)' })).toBeVisible();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
+  await page.locator('.report-saved-lesson').first().getByRole('button', { name: 'Practice this' }).click();
+  await expect(page.locator('.practice-banner')).toContainText('Practice mode: find a better move for', { timeout: 30_000 });
 });

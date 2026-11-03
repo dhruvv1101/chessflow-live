@@ -4,6 +4,7 @@ import { buildRadialLayout, fitRadialView, moveTreeSelection, treePathIds, visib
 import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
 import { useLessonActions } from './LessonsFeature.jsx';
 import { normalizeLessonFen } from './lessonData.js';
+import { buildPracticePositionFromNode, requestPracticeFromReport } from './practiceBridge.js';
 
 const PIECES = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 
@@ -242,7 +243,7 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
             {touchingLeaks.length > 0 && <div><strong>Related leaks</strong><ul>{touchingLeaks.map((leak) => <li key={leak.id}>{leak.title}</li>)}</ul></div>}
             <div><strong>Example games</strong><ul>{selected.exampleGameIds && selected.exampleGameIds.map((gameId) => <li key={gameId}><a href="#report-games-title" onClick={(event) => { event.preventDefault(); onShowGames && onShowGames(gameId); document.getElementById('report-games-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }}>Show game {gameId}</a></li>)}</ul></div>
             {(onSaveLesson || openLesson) && <button className="button button-outline" type="button" onClick={() => (onSaveLesson || openLesson)({ kind: 'position', color, normalizedFen: selected.positionKey, openingName: selected.openingName, openingKey: selected.positionKey, tags: ['opening-position'], sourceGameIds: selected.exampleGameIds || [] })}>Save as lesson</button>}
-            {limits.trainingEnabled && <button className="button button-outline" type="button">Train this line</button>}
+            {limits.trainingEnabled && <button className="button button-outline" type="button" onClick={() => requestPracticeFromReport(buildPracticePositionFromNode(selected))}>Practice from here</button>}
           </aside>}
           </div>
         </>}

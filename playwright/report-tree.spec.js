@@ -39,8 +39,8 @@ test('radial tree fits mobile and desktop, responds to keyboard and theme tokens
         if (this.native) return this.native.postMessage(message);
         if (message === 'uci') queueMicrotask(() => { this.onmessage?.({ data: 'id name Stockfish Report Test' }); this.onmessage?.({ data: 'uciok' }); });
         else if (message === 'isready') queueMicrotask(() => this.onmessage?.({ data: 'readyok' }));
-        else if (String(message).startsWith('go depth')) {
-          const depth = Number(String(message).split(' ')[2]) || 10;
+        else if (String(message).startsWith('go ')) {
+          const depth = Number(String(message).match(/depth (\d+)/)?.[1]) || 10;
           const bestMove = this.fen?.split(' ')[1] === 'b' ? 'e7e5' : 'g1f3';
           queueMicrotask(() => {
             this.onmessage?.({ data: `info depth ${depth} score cp 20 nodes 100 pv ${bestMove}` });
@@ -86,7 +86,7 @@ test('radial tree fits mobile and desktop, responds to keyboard and theme tokens
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('complementary', { name: 'Selected position details' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Train this line' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Practice from here' })).toBeVisible();
   await expect(page.getByRole('grid', { name: /Position preview/ })).toBeVisible();
   await expect(page.getByText(/1\.e4 e5/)).toBeVisible();
   const squareDimensions = await page.locator('.report-fen-board').evaluate((board) => {
@@ -113,5 +113,10 @@ test('radial tree fits mobile and desktop, responds to keyboard and theme tokens
   await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; document.documentElement.dataset.effectiveTheme = 'light'; });
   await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
   await page.screenshot({ path: 'test-results/report-tree-light-390x844.png', fullPage: true });
+  await page.locator('.report-tree-node').first().click();
+  await page.getByRole('button', { name: 'Practice from here' }).click();
+  await expect(page.locator('.practice-banner')).toContainText('Practice mode: find a better move for White', { timeout: 30_000 });
+  await page.locator('.practice-banner').getByRole('button', { name: 'Back to review' }).click();
+  await expect(page.getByRole('heading', { name: 'Game Report' })).toBeVisible();
   expect(errors).toEqual([]);
 });

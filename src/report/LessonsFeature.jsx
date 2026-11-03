@@ -3,6 +3,7 @@ import { useEntitlement } from './useEntitlement.js';
 import { lessonDraftFromRow, lessonExportPayload, matchLesson, suggestLessons, validateLessonImport } from './lessonData.js';
 import { deleteAllLessons, deleteLesson, importLessons, loadLessons, recordLessonHandling, saveLesson, updateLesson } from './lessonStorage.js';
 import { formatCount } from './formatting.js';
+import { buildPracticePositionFromLesson, requestPracticeFromReport } from './practiceBridge.js';
 
 const LessonsContext = createContext(null);
 
@@ -150,7 +151,7 @@ export function LessonsSection({ games = [], rows = [], leaks = [], analysisStat
     <h3>Lessons in your recent games</h3>
     {matches.length ? <ul className="report-lesson-list">{matches.slice(0, 30).map((match) => <li className="folder-card" key={`${match.lessonId}:${match.gameId}:${match.ply}`}><strong>{match.label} · {match.lesson.playedMove || 'position'}</strong><p>{match.reason} {match.repeatedMistake ? 'You repeated the mistake.' : 'You handled this one better.'}</p><p>Confidence: {match.confidence}. Lesson: {match.lesson.myNote || match.lesson.howToImprove || match.lesson.whatHappened}</p></li>)}</ul> : games.length && !['complete', 'error'].includes(analysisStatus) ? <p className="folder-card report-empty" role="status">Recent lesson matches appear after game analysis completes.</p> : <p className="folder-card report-empty">No saved lesson matches these recent games yet.</p>}
     <h3>Saved lessons ({lessons.length}/{limits.maxSavedLessons})</h3>
-    {!filtered.length ? <p className="folder-card report-empty">No lessons match these filters.</p> : <ul className="report-lesson-list">{filtered.map((lesson) => <LessonCard key={lesson.id} lesson={lesson} onUpdate={mutate} onDelete={() => mutate(() => deleteLesson(lesson.id))}/>)}</ul>}
+    {!filtered.length ? <p className="folder-card report-empty">No lessons match these filters.</p> : <ul className="report-lesson-list">{filtered.map((lesson) => <LessonCard key={lesson.id} lesson={lesson} trainingEnabled={limits.trainingEnabled} onUpdate={mutate} onPractice={() => requestPracticeFromReport(buildPracticePositionFromLesson(lesson))} onDelete={() => mutate(() => deleteLesson(lesson.id))}/>)}</ul>}
     {lessons.length >= limits.maxSavedLessons && <p className="small-meta">You have reached the {limits.maxSavedLessons}-lesson limit. Export your lessons before deleting any to make room.</p>}
     <div className="report-lessons-delete">
       {confirmDelete ? <><p>Export your lessons first. This permanently deletes the lessons stored in this browser.</p><button className="button button-outline" type="button" onClick={() => mutate(async () => { await deleteAllLessons(); setConfirmDelete(false); })}>Confirm delete my lessons</button><button className="button button-outline" type="button" onClick={() => setConfirmDelete(false)}>Cancel</button></>
@@ -160,10 +161,10 @@ export function LessonsSection({ games = [], rows = [], leaks = [], analysisStat
   </section>;
 }
 
-function LessonCard({ lesson, onUpdate, onDelete }) {
+function LessonCard({ lesson, trainingEnabled, onPractice, onUpdate, onDelete }) {
   const [editing, setEditing] = useState(false); const [note, setNote] = useState(lesson.myNote || ''); const [confirm, setConfirm] = useState(false);
   return <li className="folder-card report-saved-lesson">
-    <div className="report-tree-detail-heading"><div><strong>{lesson.kind.replace('_', ' ')} · {lesson.playedMove || lesson.openingName || 'position'}</strong><p className="small-meta">{lesson.status} · {lesson.source} · {lesson.tags?.join(', ') || 'no tags'}</p></div></div>
+    <div className="report-tree-detail-heading"><div><strong>{lesson.kind.replace('_', ' ')} · {lesson.playedMove || lesson.openingName || 'position'}</strong><p className="small-meta">{lesson.status} · {lesson.source} · {lesson.tags?.join(', ') || 'no tags'}</p></div>{trainingEnabled && <button className="button button-outline" type="button" onClick={onPractice}>Practice this</button>}</div>
     <p>{lesson.whatHappened}</p><p>{lesson.howToImprove}</p>
     {editing ? <><label>My note<textarea value={note} onChange={(event) => setNote(event.target.value)}/></label><button className="button button-outline" type="button" onClick={() => { onUpdate(() => updateLesson(lesson.id, { myNote: note })); setEditing(false); }}>Save note</button><button className="button button-outline" type="button" onClick={() => setEditing(false)}>Cancel</button></>
       : <><p>{lesson.myNote || 'No personal note yet.'}</p><button className="button button-outline" type="button" onClick={() => setEditing(true)}>Edit note</button></>}
