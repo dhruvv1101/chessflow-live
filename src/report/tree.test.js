@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
-import { buildOpeningTree, buildOpeningSummary } from './tree.js';
+import openings from '../../public/data/openings.json';
+import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 
 function makeGame(url, sans, result) {
   const chess = new Chess();
@@ -32,12 +33,51 @@ describe('report opening position tree', () => {
   });
 
   it('applies minimum sample and low-confidence thresholds and summarizes named openings', () => {
-    const games = [makeGame('one', ['e4'], '1-0'), makeGame('two', ['e4'], '0-1'), makeGame('three', ['e4'], '1/2-1/2')];
-    const rows = games.map((game) => ({ gameKey: game.url, ply: 1, fenBefore: game.moves[0].fenBefore, isUserMove: true, playedSan: 'e4', classification: 'Good', evaluationBefore: { winProbability: 0.5 }, evaluationAfter: { winProbability: 0.55 }, timeSpentSeconds: 3 }));
-    const key = games[0].moves[0].fenBefore.split(' ').slice(0, 4).join(' ');
-    const tree = buildOpeningTree(games, rows, { database: { [key]: { eco: 'B00', name: 'King\'s Pawn Opening' } } });
-    expect(tree.children[0].children[0]).toMatchObject({ games: 3, lowConfidence: false });
-    expect(tree.children[0].children[0].averageWinProbabilityChange).toBeCloseTo(0.05);
-    expect(buildOpeningSummary(tree)).toEqual(expect.arrayContaining([expect.objectContaining({ eco: 'B00', name: 'King\'s Pawn Opening', games: 3 })]));
+    const games = [makeGame('one', ['e4', 'e5', 'Ke2', 'Nc6', 'Nf3', 'Nf6'], '1-0'), makeGame('two', ['e4', 'e5', 'Ke2', 'Nc6', 'Nf3', 'Nf6'], '0-1'), makeGame('three', ['e4', 'e5', 'Ke2', 'Nc6', 'Nf3', 'Nf6'], '1/2-1/2')];
+    games.forEach((game) => { game.eco = 'C20'; });
+    const rows = games.map((game) => ({ gameKey: game.url, ply: 3, fenBefore: game.moves[2].fenBefore, fenAfter: game.moves[2].fenAfter, isUserMove: true, playedSan: 'Ke2', classification: 'Good', evaluationBefore: { winProbability: 0.5 }, evaluationAfter: { winProbability: 0.55 }, timeSpentSeconds: 3 }));
+    const tree = buildOpeningTree(games, attachOpeningContexts(games, rows, openings), { database: openings });
+    const node = tree.nodes.find((entry) => entry.positionKey === games[0].moves[2].fenBefore.split(' ').slice(0, 4).join(' '));
+    expect(node).toMatchObject({ games: 3, lowConfidence: false, eco: 'C20', openingName: 'Bongcloud Attack' });
+    expect(node.averageWinProbabilityChange).toBeCloseTo(0.05);
+    expect(buildOpeningSummary(tree)).toEqual(expect.arrayContaining([expect.objectContaining({ color: 'white', eco: 'C20', name: 'Bongcloud Attack', games: 3 })]));
+  });
+
+  it('uses the deepest opening on each game path and never attributes a colliding ECO name to another line', () => {
+    const bongclouds = [makeGame('b1', ['e4', 'e5', 'Ke2', 'Nc6', 'Nf3', 'Nf6'], '1-0'), makeGame('b2', ['e4', 'e5', 'Ke2', 'Nc6', 'Nf3', 'Nf6'], '0-1')];
+    bongclouds.forEach((game) => { game.eco = 'C20'; });
+    const tennison = makeGame('t1', ['e4', 'd5', 'Nf3', 'Nf6', 'd4', 'c6'], '1-0');
+    tennison.eco = 'A06';
+    const games = [...bongclouds, tennison];
+    const rows = games.map((game) => ({
+      gameKey: game.url, ply: 3, fenBefore: game.moves[2].fenBefore,
+      fenAfter: game.moves[2].fenAfter, isUserMove: true, playedSan: game.moves[2].san,
+      classification: 'Good', evaluationBefore: { winProbability: 0.5 }, evaluationAfter: { winProbability: 0.5 },
+    }));
+    const contextual = attachOpeningContexts(games, rows, openings);
+    const tree = buildOpeningTree(games, contextual, { database: openings });
+    const summary = buildOpeningSummary(tree);
+    expect(contextual.find((row) => row.gameKey === 'b1').openingContext).toMatchObject({ eco: 'C20', name: 'Bongcloud Attack' });
+    expect(contextual.find((row) => row.gameKey === 't1').openingContext).toMatchObject({ eco: 'A06', name: expect.stringContaining('Tennison Gambit') });
+    expect(summary.find((entry) => entry.name === 'Bongcloud Attack').games).toBe(2);
+    expect(summary.some((entry) => entry.name.includes('Tennison Gambit'))).toBe(false);
+  });
+
+  it('removes the hung-piece tag on a named gambit line and records the gambit on its node', () => {
+    const game = makeGame('englund', ['d4', 'e5', 'f4', 'exf4', 'Nf3'], '0-1');
+    game.eco = 'A40';
+    const row = { gameKey: game.url, ply: 3, fenBefore: game.moves[2].fenBefore, fenAfter: game.moves[2].fenAfter,
+      isUserMove: true, playedSan: 'f4', notation: '2. f4', tacticTags: [{ kind: 'allowed-capture-hung-piece' }], classification: 'Mistake' };
+    const contextual = attachOpeningContexts([game], [row], openings);
+    expect(contextual[0].tacticTags).toEqual([]);
+    expect(contextual[0].isNamedOpeningMove).toBe(true);
+    const tree = buildOpeningTree([game], contextual, { database: openings });
+    expect(tree.nodes[0].openingGambits).toEqual([expect.objectContaining({ move: '2. f4', name: expect.stringContaining('Gambit') })]);
+  });
+
+  it('excludes short games from the tree sample', () => {
+    const short = makeGame('short', ['e4', 'e5'], '0-1');
+    const row = { gameKey: 'short', ply: 1, fenBefore: short.moves[0].fenBefore, isUserMove: true };
+    expect(buildOpeningTree([short], [row]).nodes).toEqual([]);
   });
 });

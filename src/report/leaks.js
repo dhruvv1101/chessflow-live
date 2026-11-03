@@ -1,11 +1,15 @@
 import { FREE_LIMITS } from './config.js';
-import { normalizePositionKey } from './tree.js';
+import { hasEnoughUserMoves, normalizePositionKey } from './tree.js';
 
 const FLAGGED = new Set(['Inaccuracy', 'Mistake', 'Blunder']);
 const TAG_LABELS = Object.freeze({
   'played-capture-lost-value': 'Played capture that lost value',
   'missed-capture': 'Missed capture',
   'allowed-capture-hung-piece': 'Allowed capture / hung piece',
+  missed_opponent_threat: "Missed opponent's threat",
+  missed_capture: 'Missed capture',
+  missed_mate: 'Missed checkmate',
+  hung_piece: 'Hung piece',
 });
 
 function sumExpectedLoss(rows) {
@@ -40,10 +44,13 @@ export function detectLeaks(games, rows, {
   lowConfidenceGames = FREE_LIMITS.reportInsights.lowConfidenceGames,
   maxExampleGames = FREE_LIMITS.reportInsights.maxExampleGames,
   expectedScoreGap = FREE_LIMITS.reportInsights.openingLeakExpectedScoreGap,
+  timeLeakMinimumRateDifference = FREE_LIMITS.reportInsights.timeLeakMinimumRateDifference,
+  timeLeakMinimumMoves = FREE_LIMITS.reportInsights.timeLeakMinimumMoves,
+  minimumUserMoves = FREE_LIMITS.minimumUserMoves,
   topN = FREE_LIMITS.topLeaks,
 } = {}) {
   const options = { minimumSampleGames, lowConfidenceGames, maxExampleGames };
-  const gameById = new Map(games.map((game) => [game.url, game]));
+  const gameById = new Map(games.filter((game) => hasEnoughUserMoves(game, minimumUserMoves)).map((game) => [game.url, game]));
   const userRows = rows.filter((row) => row.isUserMove && FLAGGED.has(row.classification));
   const leaks = [];
   const repeatedMoves = new Map();
@@ -81,16 +88,28 @@ export function detectLeaks(games, rows, {
     if (leak) leaks.push(leak);
   }
 
+  const allUserRows = rows.filter((row) => row.isUserMove && gameById.has(row.gameKey));
+  const normalRows = allUserRows.filter((row) => row.timeContext === 'normal pace');
+  const normalMistakes = normalRows.filter((row) => FLAGGED.has(row.classification)).length;
   const timeGroups = new Map();
-  for (const row of userRows) {
+  for (const row of allUserRows) {
     if (!['long think', 'low clock', 'instant move'].includes(row.timeContext)) continue;
     const group = timeGroups.get(row.timeContext) || [];
     group.push(row);
     timeGroups.set(row.timeContext, group);
   }
-  for (const [context, timeRows] of timeGroups) {
-    const leak = makeLeak('time-management', context, `Mistakes after ${context} replies`, timeRows, options);
-    if (leak) leaks.push(leak);
+  for (const [context, contextRows] of timeGroups) {
+    const mistakes = contextRows.filter((row) => FLAGGED.has(row.classification));
+    const contextRate = contextRows.length ? mistakes.length / contextRows.length : 0;
+    const normalRate = normalRows.length ? normalMistakes / normalRows.length : 0;
+    if (contextRows.length < timeLeakMinimumMoves || normalRows.length < timeLeakMinimumMoves
+      || contextRate - normalRate < timeLeakMinimumRateDifference) continue;
+    const leak = makeLeak('time-management', context, `Mistakes after ${context} replies`, mistakes, options);
+    if (leak) leaks.push({ ...leak, baseline: {
+      context, contextMistakes: mistakes.length, contextMoves: contextRows.length,
+      normalMistakes, normalMoves: normalRows.length,
+      contextRate, normalRate, minimumDifference: timeLeakMinimumRateDifference,
+    } });
   }
 
   const tacticGroups = new Map();

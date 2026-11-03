@@ -110,7 +110,7 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
         return data.games;
       });
     },
-    importRecentGames(username, { maxGames = FREE_LIMITS.maxGames, signal, onProgress = () => {} } = {}) {
+    importRecentGames(username, { maxGames = FREE_LIMITS.maxGames, minimumUserMoves = FREE_LIMITS.minimumUserMoves, signal, onProgress = () => {} } = {}) {
       const valid = parseReportUsername(username);
       return enqueue(async () => {
         onProgress({ stage: 'archives', completed: 0, total: 0, message: 'Finding your recent game archives…' });
@@ -134,9 +134,9 @@ export function createReportChessComClient({ fetchImpl = (...args) => globalThis
           }
           monthsFetched += 1;
           onProgress({ stage: 'games', completed: monthsFetched, total: months.length, message: `Loaded ${monthsFetched} of ${months.length} archives…` });
-          if (buildRecentGameSet(rawGames, valid, { limits: { maxGames } }).games.length >= maxGames) break;
+          if (buildRecentGameSet(rawGames, valid, { limits: { maxGames, minimumUserMoves } }).games.length >= maxGames) break;
         }
-        const result = buildRecentGameSet(rawGames, valid, { limits: { maxGames } });
+        const result = buildRecentGameSet(rawGames, valid, { limits: { maxGames, minimumUserMoves } });
         result.skippedVariants += skippedVariants;
         result.dropped.variants += skippedVariants;
         result.archiveMonthsFound = data.archives.length;

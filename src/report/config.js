@@ -1,5 +1,8 @@
 export const FREE_LIMITS = Object.freeze({
   maxGames: 25,
+  // Require three actual moves by the imported player; very short games do
+  // not count toward the free import cap or behavioral statistics.
+  minimumUserMoves: 3,
   analysisDepth: 10,
   lossThresholds: Object.freeze({ inaccuracy: 0.05, mistake: 0.15, blunder: 0.25 }),
   openingNoiseMinWinProbabilityLoss: 0.08,
@@ -28,7 +31,9 @@ export const FREE_LIMITS = Object.freeze({
     maxExampleGames: 3,
     openingLeakExpectedScoreGap: 0.15,
     firstBigMistakeMinimumWinProbabilityLoss: 0.15,
+    timeLeakMinimumRateDifference: 0.15,
+    timeLeakMinimumMoves: 3,
   }),
-  topLeaks: 3,
+  topLeaks: 8,
   drillsPerDay: 5,
 });

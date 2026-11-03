@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildRecentGameSet, parseReportUsername, parseReportPgn } from './chesscom.js';
 import { createReportChessComClient } from './client.js';
 
-const pgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "1-0"]\n[ECO "C20"]\n[Opening "King's Pawn Game"]\n\n1. e4 {[%clk 0:09:59.2]} e5 {[%clk 0:09:58.1]} 2. Nf3 1-0`;
+const pgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "1-0"]\n[ECO "C20"]\n[Opening "King's Pawn Game"]\n\n1. e4 {[%clk 0:09:59.2]} e5 {[%clk 0:09:58.1]} 2. Nf3 Nc6 3. Bc4 1-0`;
 
 describe('report Chess.com import', () => {
   it('validates usernames using the report import format', () => {
@@ -15,7 +15,7 @@ describe('report Chess.com import', () => {
     const parsed = parseReportPgn({ url: 'https://chess.com/game/1', pgn, rules: 'chess', time_class: 'blitz', white: { username: 'TestPlayer' }, black: { username: 'Opponent' }, end_time: 1_800_000_000 }, 'testplayer');
     expect(parsed).toMatchObject({ userColor: 'white', result: '1-0', timeClass: 'blitz', eco: 'C20', opening: "King's Pawn Game" });
     expect(parsed.headers.White).toBe('TestPlayer');
-    expect(parsed.moves.map((move) => move.clock)).toEqual(['0:09:59.2', '0:09:58.1', null]);
+    expect(parsed.moves.map((move) => move.clock)).toEqual(['0:09:59.2', '0:09:58.1', null, null, null]);
     expect(parsed.moves[0]).toMatchObject({ san: 'e4', uci: 'e2e4', ply: 1 });
   });
 
@@ -63,7 +63,19 @@ describe('report Chess.com import', () => {
     expect(new Set(result.games.map((entry) => entry.url)).size).toBe(25);
     expect(result.games[0].endTime).toBeGreaterThanOrEqual(result.games.at(-1).endTime);
     expect(result.skippedVariants).toBe(1);
-    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, noMoves: 0, missingMetadata: 1, duplicates: 1, overLimit: 7 });
+    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, noMoves: 0, shortGames: 0, missingMetadata: 1, duplicates: 1, overLimit: 7 });
+  });
+
+  it('excludes games with fewer than three moves by the imported player before applying the cap', () => {
+    const shortPgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "0-1"]\n\n1. e4 e5 2. Nf3 1/2-1/2`;
+    const longPgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 1-0`;
+    const result = buildRecentGameSet([
+      { url: 'short', pgn: shortPgn, rules: 'chess', end_time: 200 },
+      { url: 'long', pgn: longPgn, rules: 'chess', end_time: 100 },
+    ], 'TestPlayer', { limits: { maxGames: 1, minimumUserMoves: 3 } });
+    expect(result.games.map((game) => game.url)).toEqual(['long']);
+    expect(result.dropped.shortGames).toBe(1);
+    expect(result.skippedGameReasons[0]).toMatchObject({ kind: 'too-few-user-moves', reason: expect.stringContaining('Only 2 moves') });
   });
 });
 
@@ -81,12 +93,12 @@ describe('report Chess.com client', () => {
       return new Response(null, { status: 304, headers: { etag: 'oct-v1' } });
     });
     const client = createReportChessComClient({ fetchImpl, sleep: async () => {} });
-    await client.getMonth('test', 2026, 10);
+    await client.getMonth('TestPlayer', 2026, 10);
     calls.length = 0;
-    const imported = await client.importRecentGames('test', { maxGames: 25 });
+    const imported = await client.importRecentGames('TestPlayer', { maxGames: 25 });
     expect(imported.games).toEqual([]);
     expect(imported).toMatchObject({ archiveMonthsFound: 2, archiveMonthsFetched: 2, gamesFetched: 0 });
-    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, noMoves: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 });
+    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, noMoves: 0, shortGames: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 });
     expect(calls.map((url) => url.match(/month=\d+/)?.[0] || 'archives')).toEqual(['archives', 'month=11', 'month=11', 'month=10']);
     const octoberRequest = fetchImpl.mock.calls.at(-1)[1];
     expect(octoberRequest.headers['If-None-Match']).toBe('oct-v1');
@@ -108,7 +120,7 @@ describe('report Chess.com client', () => {
       return new Response(JSON.stringify({ games: monthGames.get(month) }));
     });
     const client = createReportChessComClient({ fetchImpl });
-    const result = await client.importRecentGames('test', { maxGames: 25 });
+    const result = await client.importRecentGames('TestPlayer', { maxGames: 25 });
 
     expect(result.games).toHaveLength(25);
     expect(result.games.map((game) => game.url)).toEqual([...monthGames.values()].flat().slice(0, 25).map((game) => game.url));
@@ -123,7 +135,7 @@ describe('report Chess.com client', () => {
       ? new Response(JSON.stringify({ archives: ['https://api.chess.com/pub/player/test/games/2010/01'] }))
       : new Response(JSON.stringify({ games: [oldGame] })));
     const client = createReportChessComClient({ fetchImpl });
-    const result = await client.importRecentGames('test');
+    const result = await client.importRecentGames('TestPlayer');
 
     expect(result.games.map((game) => game.url)).toEqual([oldGame.url]);
     expect(result.archiveMonthsFound).toBe(1);

@@ -7,7 +7,7 @@ import { clearAnalysisCache } from './analysisCache.js';
 import AnalysisProgress from './AnalysisProgress.jsx';
 import ReportInsights from './ReportInsights.jsx';
 import { loadOpeningDatabase } from '../openings.js';
-import { buildOpeningTree, buildOpeningSummary } from './tree.js';
+import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 import { detectLeaks } from './leaks.js';
 import { summarizeFirstBigMistakes } from './firstBigMistake.js';
 
@@ -22,7 +22,7 @@ function countLabel(count, singular, plural = `${singular}s`) {
 function formatImportSummary(result, limits) {
   const { dropped } = result;
   const empty = result.games.length === 0 && result.gamesFetched === 0 ? ' No games were listed in the fetched archives.' : '';
-  return `Imported ${result.games.length} of up to ${limits.maxGames} most recent standard games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsFetched} fetched, ${result.archiveMonthsNotFetched} not fetched after reaching the game limit. ${result.gamesFetched} games checked. Dropped by reason: ${countLabel(dropped.variants, 'variant')}, ${countLabel(dropped.invalidPgn, 'invalid PGN')}, ${countLabel(dropped.noMoves, 'game with no moves', 'games with no moves')}, ${countLabel(dropped.missingMetadata, 'game missing details', 'games missing details')}, ${countLabel(dropped.duplicates, 'duplicate game')}, ${dropped.overLimit} beyond the ${limits.maxGames}-game limit.${empty}`;
+  return `Imported ${result.games.length} of up to ${limits.maxGames} most recent standard games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsFetched} fetched, ${result.archiveMonthsNotFetched} not fetched after reaching the game limit. ${result.gamesFetched} games checked. Dropped by reason: ${countLabel(dropped.variants, 'variant')}, ${countLabel(dropped.invalidPgn, 'invalid PGN')}, ${countLabel(dropped.noMoves, 'game with no moves', 'games with no moves')}, ${countLabel(dropped.shortGames || 0, 'short game', 'short games')} with fewer than ${limits.minimumUserMoves} moves by you, ${countLabel(dropped.missingMetadata, 'game missing details', 'games missing details')}, ${countLabel(dropped.duplicates, 'duplicate game')}, ${dropped.overLimit} beyond the ${limits.maxGames}-game limit.${empty}`;
 }
 
 export default function ReportPage() {
@@ -62,12 +62,14 @@ export default function ReportPage() {
 
   const insights = useMemo(() => {
     if (!analysisRows.length || !openingDatabase) return null;
-    const tree = buildOpeningTree(games, analysisRows, { database: openingDatabase, ...limits.reportInsights });
+    const contextualRows = attachOpeningContexts(games, analysisRows, openingDatabase);
+    const tree = buildOpeningTree(games, contextualRows, { database: openingDatabase, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves });
     return {
       tree,
       openingRows: buildOpeningSummary(tree),
-      leaks: detectLeaks(games, analysisRows, { tree, topN: limits.topLeaks, ...limits.reportInsights }),
-      firstMistakes: summarizeFirstBigMistakes(games, analysisRows, limits.reportInsights),
+      leaks: detectLeaks(games, contextualRows, { tree, topN: limits.topLeaks, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
+      firstMistakes: summarizeFirstBigMistakes(games, contextualRows, { ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
+      analysisRows: contextualRows,
     };
   }, [analysisRows, games, limits, openingDatabase]);
 

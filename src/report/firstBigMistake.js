@@ -1,4 +1,5 @@
 import { FREE_LIMITS } from './config.js';
+import { hasEnoughUserMoves } from './tree.js';
 
 function lostByUser(game) {
   if (game.userColor === 'white') return game.result === '0-1';
@@ -14,11 +15,12 @@ function mostCommon(values) {
 
 export function summarizeFirstBigMistakes(games, rows, {
   minimumWinProbabilityLoss = FREE_LIMITS.reportInsights.firstBigMistakeMinimumWinProbabilityLoss,
+  minimumUserMoves = FREE_LIMITS.minimumUserMoves,
 } = {}) {
   const entries = [];
   let gamesLost = 0;
   for (const game of games) {
-    if (!lostByUser(game)) continue;
+    if (!hasEnoughUserMoves(game, minimumUserMoves) || !lostByUser(game)) continue;
     gamesLost += 1;
     const first = rows.filter((row) => row.gameKey === game.url && row.isUserMove
       && ['Mistake', 'Blunder'].includes(row.classification)

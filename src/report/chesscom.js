@@ -98,7 +98,7 @@ export function buildRecentGameSet(rawGames, username, { limits = FREE_LIMITS } 
   let skippedInvalid = 0;
   let skippedNoMoves = 0;
   const skippedGameReasons = [];
-  const dropped = { variants: 0, invalidPgn: 0, noMoves: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 };
+  const dropped = { variants: 0, invalidPgn: 0, noMoves: 0, shortGames: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 };
   const byUrl = new Map();
   for (const raw of rawGames) {
     if (!raw || typeof raw !== 'object') { skippedInvalid += 1; dropped.invalidPgn += 1; continue; }
@@ -107,6 +107,12 @@ export function buildRecentGameSet(rawGames, username, { limits = FREE_LIMITS } 
     if (byUrl.has(raw.url)) { dropped.duplicates += 1; continue; }
     try {
       const parsed = parseReportPgn(raw, username);
+      const playerMoves = parsed.moves.filter((move) => move.color === (parsed.userColor === 'white' ? 'w' : parsed.userColor === 'black' ? 'b' : null)).length;
+      if (playerMoves < (limits.minimumUserMoves ?? FREE_LIMITS.minimumUserMoves)) {
+        dropped.shortGames += 1;
+        if (skippedGameReasons.length < 25) skippedGameReasons.push({ url: parsed.url, kind: 'too-few-user-moves', reason: `Only ${playerMoves} moves by the imported player; at least ${limits.minimumUserMoves ?? FREE_LIMITS.minimumUserMoves} are required.` });
+        continue;
+      }
       byUrl.set(parsed.url, parsed);
     } catch (error) {
       const isNoMoves = error?.code === 'NO_MOVES';

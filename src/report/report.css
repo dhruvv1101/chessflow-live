@@ -31,6 +31,7 @@
 .report-insights { margin-top: 34px; }
 .report-insight-section { margin-top: 22px; }
 .report-insight-section > h3 { margin: 0 0 12px; font-size: 16px; font-weight: 950; }
+.report-insight-section > h4 { margin: 0 0 10px; font-size: 13px; font-weight: 900; }
 .report-insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px; }
 .report-insight-card { min-width: 0; }
 .report-insight-card h3 { margin: 5px 0 8px; font-size: 17px; font-weight: 950; overflow-wrap: anywhere; }

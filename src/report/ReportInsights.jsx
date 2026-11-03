@@ -7,6 +7,10 @@ function formatChange(value) {
   return `${percent > 0 ? '+' : ''}${percent.toFixed(1)}%`;
 }
 
+function lossSummary(leak) {
+  return `about ${leak.expectedScoreLoss.toFixed(1)} points lost over ${leak.frequency} occurrences (avg ${Math.round(leak.averageSwing * 100)} percentage points each)`;
+}
+
 function ExplanationDetails({ explanation }) {
   return <div className="report-insight-explanation">
     <p><strong>What happened?</strong> {explanation.played} was marked {explanation.classification}.</p>
@@ -40,14 +44,15 @@ function LeakCard({ leak }) {
   return <article className="folder-card report-insight-card">
     <p className="meta-line">{leak.kind.replaceAll('-', ' ').toUpperCase()}</p>
     <h3>{leak.title}</h3>
-    <p className="small-meta">{leak.frequency} occurrences across {leak.gamesAffected} games · expected-score loss {formatChange(leak.expectedScoreLoss)} · impact {leak.score.toFixed(3)}</p>
+    <p className="small-meta">{lossSummary(leak)} across {leak.gamesAffected} games.</p>
     {leak.lowConfidence && <span className="review-badge badge-peach report-confidence-badge">Low confidence · fewer than 3 games</span>}
     {leak.kind === 'conversion' && <p className="small-meta">Average lost-advantage swing: {formatChange(leak.averageSwing)}.</p>}
     {leak.kind === 'missed-chance' && <p className="small-meta">Examples include time spent on your reply.</p>}
+    {leak.kind === 'time-management' && leak.baseline && <p className="small-meta">Mistakes in {Math.round(leak.baseline.contextRate * 100)}% of {leak.baseline.context} moves vs {Math.round(leak.baseline.normalRate * 100)}% of normal-pace moves (n = {leak.baseline.contextMoves} / {leak.baseline.normalMoves}).</p>}
     <ul className="report-insight-examples">{leak.examples.map((example) => {
       const key = `${example.gameId}:${example.ply}`;
       return <li key={key}>
-        <span>{example.move || `Ply ${example.ply}`} · {example.playedSan} · {example.timeContext}{example.replyTimeSeconds != null ? ` · ${example.replyTimeSeconds}s reply` : ''}</span>
+        <span>{example.move || `Ply ${example.ply}`} · {example.timeContext}{example.replyTimeSeconds != null ? ` · ${example.replyTimeSeconds}s reply` : ''}</span>
         <button className="button button-outline" type="button" aria-expanded={openExample === key} onClick={() => explain(example)}>
           {openExample === key ? 'Hide explanation' : 'Explain example'}
         </button>
@@ -62,6 +67,19 @@ function LeakCard({ leak }) {
 }
 
 export default function ReportInsights({ leaks, openingRows, firstMistakes }) {
+  const openingTable = (color, title) => {
+    const items = openingRows.filter((opening) => opening.color === color);
+    return <section className="report-insight-section" aria-label={`${title} opening performance`}>
+      <h4>{title}</h4>
+      {items.length ? <div className="report-analysis-table-wrap folder-card report-opening-table-wrap"><table className="report-analysis-table report-opening-table">
+        <thead><tr><th scope="col">Opening</th><th scope="col">Games</th><th scope="col">W / D / L</th><th scope="col">Avg. win-probability change</th><th scope="col">Confidence</th></tr></thead>
+        <tbody>{items.map((opening) => <tr key={`${color}:${opening.eco}:${opening.name}`}>
+          <th scope="row">{opening.eco} · {opening.name}</th><td>{opening.games}</td><td>{opening.wins} / {opening.draws} / {opening.losses}</td>
+          <td>{formatChange(opening.averageWinProbabilityChange)}</td><td>{opening.lowConfidence ? <span className="review-badge badge-peach report-confidence-badge">Low confidence</span> : 'Good sample'}</td>
+        </tr>)}</tbody>
+      </table></div> : <p className="folder-card report-insight-empty">No named openings have enough {color} games for a summary.</p>}
+    </section>;
+  };
   return <section className="report-insights" aria-labelledby="report-insights-title">
     <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Opening tree &amp; recurring leaks</h2></div></div>
     <section className="report-insight-section" aria-labelledby="report-leaks-title">
@@ -71,13 +89,8 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes }) {
     </section>
     <section className="report-insight-section" aria-labelledby="report-opening-table-title">
       <h3 id="report-opening-table-title">Opening performance</h3>
-      {openingRows.length ? <div className="report-analysis-table-wrap folder-card report-opening-table-wrap"><table className="report-analysis-table report-opening-table">
-        <thead><tr><th scope="col">Opening</th><th scope="col">Games</th><th scope="col">W / D / L</th><th scope="col">Avg. win-probability change</th><th scope="col">Confidence</th></tr></thead>
-        <tbody>{openingRows.map((opening) => <tr key={`${opening.eco}:${opening.name}`}>
-          <th scope="row">{opening.eco} · {opening.name}</th><td>{opening.games}</td><td>{opening.wins} / {opening.draws} / {opening.losses}</td>
-          <td>{formatChange(opening.averageWinProbabilityChange)}</td><td>{opening.lowConfidence ? <span className="review-badge badge-peach report-confidence-badge">Low confidence</span> : 'Good sample'}</td>
-        </tr>)}</tbody>
-      </table></div> : <p className="folder-card report-insight-empty">No named opening positions have enough games for a summary yet.</p>}
+      {openingTable('white', 'White')}
+      {openingTable('black', 'Black')}
     </section>
     <section className="report-insight-section" aria-labelledby="report-first-mistake-title">
       <h3 id="report-first-mistake-title">First big mistake in lost games</h3>
