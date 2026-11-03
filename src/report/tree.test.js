@@ -14,6 +14,17 @@ function makeGame(url, sans, result) {
 }
 
 describe('report opening position tree', () => {
+  it('counts games on a shared move edge for line-width scaling', () => {
+    const games = [makeGame('edge-a', ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Nf6', 'd3'], '1-0'), makeGame('edge-b', ['e4', 'e5', 'Nf3', 'Nc6', 'Bc4', 'Nf6', 'd3'], '0-1')];
+    const rows = games.flatMap((game) => [1, 3, 5].map((ply) => ({
+      gameKey: game.url, ply, fenBefore: game.moves[ply - 1].fenBefore, isUserMove: true,
+      playedSan: game.moves[ply - 1].san, opponentResponseSan: game.moves[ply].san,
+    })));
+    const tree = buildOpeningTree(games, rows);
+    expect(tree.links).toHaveLength(2);
+    expect(tree.links[0]).toMatchObject({ move: 'e4', opponentReply: 'e5', games: 2, gameIds: ['edge-a', 'edge-b'] });
+  });
+
   it('merges transpositions into one FEN-keyed node and aggregates user outcomes', () => {
     const games = [
       makeGame('game-a', ['Nf3', 'd5', 'g3', 'Nf6', 'Bg2'], '1-0'),
@@ -29,6 +40,7 @@ describe('report opening position tree', () => {
     expect(nodes).toHaveLength(1);
     expect(nodes[0]).toMatchObject({ games: 2, wins: 1, draws: 1, losses: 0, eco: 'A07', openingName: 'Reti Opening', lowConfidence: true });
     expect(nodes[0].exampleGameIds).toEqual(['game-a', 'game-b']);
+    expect(nodes[0]).toMatchObject({ depthPly: 4, move: 'Bg2' });
     expect(tree.children.flatMap((color) => color.children).find((node) => node.positionKey === key)).toEqual(nodes[0]);
   });
 

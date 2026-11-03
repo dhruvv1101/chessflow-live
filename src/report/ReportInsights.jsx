@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { buildMoveExplanation } from './explanations.js';
+import RadialOpeningTree from './RadialOpeningTree.jsx';
 
 function formatChange(value) {
   if (!Number.isFinite(value)) return '—';
@@ -66,7 +67,7 @@ function LeakCard({ leak }) {
   </article>;
 }
 
-export default function ReportInsights({ leaks, openingRows, firstMistakes, openingStatus = 'ready', leaksStatus = 'ready' }) {
+export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, openingStatus = 'ready', leaksStatus = 'ready' }) {
   const openingTable = (color, title) => {
     const items = openingRows.filter((opening) => opening.color === color);
     return <section className="report-insight-section" aria-label={`${title} opening performance`}>
@@ -83,7 +84,8 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, open
   return <section className="report-insights" aria-labelledby="report-insights-title">
     <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div></div>
     <section className="report-insight-section" aria-labelledby="report-opening-table-title">
-      <h3 id="report-opening-table-title">Opening tree</h3>
+      <RadialOpeningTree tree={tree} leaks={leaks} status={openingStatus}/>
+      <h3 id="report-opening-table-title">Opening performance</h3>
       {openingStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Opening tree is being prepared…</p>
         : openingStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Opening names are unavailable. Your imported games remain saved.</p>
           : openingStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p> : <>

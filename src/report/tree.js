@@ -79,6 +79,8 @@ export function buildOpeningTree(games, rows, {
       const opening = row.openingContext || (Object.hasOwn(row, 'openingContext') ? null : database[positionKey]) || null;
       node = {
         id, positionKey, color: game.userColor,
+        depthPly: Math.max(0, Number(row.ply || 1) - 1),
+        move: row.notation || row.playedSan || `Ply ${row.ply || 1}`,
         name: opening?.name || `Position at ${row.notation || `ply ${row.ply}`}`,
         openingName: opening?.name || null, eco: opening?.eco || null,
         openingPlyCount: opening?.matchedPly ?? opening?.plyCount ?? null,
@@ -118,7 +120,7 @@ export function buildOpeningTree(games, rows, {
     const scores = [...node._results.values()];
     const gamesCount = node._gameIds.size;
     return {
-      id: node.id, positionKey: node.positionKey, color: node.color,
+      id: node.id, positionKey: node.positionKey, color: node.color, depthPly: node.depthPly, move: node.move,
       name: node.name, openingName: node.openingName, eco: node.eco, openingPlyCount: node.openingPlyCount,
       games: gamesCount, wins: scores.filter((score) => score === 1).length,
       draws: scores.filter((score) => score === 0.5).length,
@@ -154,7 +156,9 @@ export function buildOpeningTree(games, rows, {
       if (!links.has(linkKey)) links.set(linkKey, {
         source: previous.id, target: current.id,
         move: previous.row.playedSan, opponentReply: previous.row.opponentResponseSan || null,
+        _gameIds: new Set(),
       });
+      links.get(linkKey)._gameIds.add(previous.row.gameKey);
     }
   }
 
@@ -168,7 +172,7 @@ export function buildOpeningTree(games, rows, {
       { name: 'Black', color: 'black', children: sortNodes(blackNodes) },
     ],
     nodes,
-    links: [...links.values()],
+    links: [...links.values()].map(({ _gameIds, ...link }) => ({ ...link, games: _gameIds.size, gameIds: [..._gameIds] })),
   };
 }
 

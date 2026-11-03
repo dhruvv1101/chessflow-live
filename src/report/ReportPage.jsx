@@ -159,6 +159,7 @@ export default function ReportPage() {
     <ReportFilters games={games} shownCount={filtered.games.length} value={filters} onChange={setFilters} loading={loading} error={storageError}/>
     <ReportInsights
       leaks={insights?.leaks || []} openingRows={insights?.openingRows || []}
+      tree={insights?.tree}
       firstMistakes={insights?.firstMistakes || { gamesLost: 0, gamesWithFirstMistake: 0, entries: [] }}
       openingStatus={!filtered.games.length ? 'empty' : openingStatus === 'error' ? 'error' : openingStatus === 'ready' ? 'ready' : 'loading'}
       leaksStatus={!filtered.games.length ? 'empty' : analysisStatus === 'error' ? 'error' : !filtered.rows.length ? 'loading' : 'ready'}

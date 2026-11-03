@@ -14,6 +14,50 @@
 .report-import-content { position: relative; padding: 18px; border-top: var(--line); }
 .report-import-content .folder-head { margin-top: 2px; }
 .report-section-heading { align-items: center; }
+.report-tree-section { min-width: 0; margin: 18px 0 24px; }
+.report-tree-heading, .report-tree-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.report-tree-heading h3, .report-tree-detail h4 { margin: 3px 0 8px; }
+.report-tree-side-toggle, .report-tree-zoom { display: flex; flex-wrap: wrap; gap: 6px; }
+.report-tree-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.report-tree-controls .setting-select { min-width: 150px; }
+.report-tree-controls input[type="range"] { accent-color: var(--purple); }
+.report-tree-check { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; color: var(--text); font-size: 11px; font-weight: 800; }
+.report-tree-check input { width: 17px; height: 17px; accent-color: var(--purple); }
+.report-tree-card { min-width: 0; padding: 12px; overflow: hidden; }
+.report-tree-view-layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.report-tree-view-layout.has-selection { grid-template-columns: minmax(0, 1fr) minmax(250px, .42fr); align-items: start; }
+.report-radial-svg { display: block; width: 100%; max-height: 680px; aspect-ratio: 1; touch-action: none; cursor: grab; }
+.report-radial-svg:active { cursor: grabbing; }
+.report-tree-ring { fill: none; stroke: var(--divider); stroke-width: 1; stroke-dasharray: 2 5; opacity: .65; pointer-events: none; }
+.report-tree-link { stroke: var(--purple); opacity: .56; pointer-events: none; }
+.report-tree-node { cursor: pointer; outline: none; }
+.report-tree-node circle { stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.report-tree-node circle.is-low-confidence { stroke: var(--divider); stroke-dasharray: 3 3; }
+.report-tree-node circle.is-leak { stroke: var(--pink); stroke-width: 3; }
+.report-tree-node circle.is-selected, .report-tree-node:focus-visible circle { stroke: var(--yellow); stroke-width: 4; }
+.report-tree-node .report-tree-leak-marker { fill: var(--pink); stroke: var(--surface); stroke-width: 1.5; }
+.report-tree-label { fill: var(--text); font: inherit; font-size: 9px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.report-tree-legend { display: flex; flex-wrap: wrap; gap: 10px 16px; padding: 8px 3px 2px; color: var(--text); font-size: 10px; font-weight: 750; }
+.report-tree-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.report-tree-legend i { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--outline); border-radius: 50%; }
+.report-legend-good { background: var(--green); }
+.report-legend-bad { background: var(--pink); }
+.report-legend-leak { outline: 2px solid var(--pink); }
+.report-legend-low { border-style: dashed !important; background: var(--surface-alt); }
+.report-tree-table { display: grid; gap: 6px; max-height: 560px; overflow: auto; padding: 4px 8px 4px 24px; }
+.report-tree-table li { margin-left: calc(var(--tree-depth) * 10px); }
+.report-tree-table .button { max-width: 100%; text-align: left; white-space: normal; }
+.report-tree-detail { margin-top: 12px; padding: 16px; }
+.report-tree-view-layout .report-tree-detail { position: sticky; top: 12px; max-height: min(72vh, 680px); overflow: auto; }
+.report-tree-detail > p, .report-tree-detail li, .report-tree-detail a { overflow-wrap: anywhere; }
+.report-fen-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); width: min(100%, 248px); aspect-ratio: 1; margin: 12px 0; overflow: hidden; border: var(--line); border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+.report-fen-square { display: grid; place-items: center; min-width: 0; color: var(--text); font-size: clamp(15px, 4vw, 25px); line-height: 1; }
+.report-fen-square.is-light { background: var(--surface-alt); }
+.report-fen-square.is-dark { background: var(--purple); }
+.report-fen-square.piece-white { color: var(--white-fill); -webkit-text-stroke: 1px var(--piece-white-outline, var(--outline)); }
+.report-fen-square.piece-black { color: var(--piece-dark-fill); -webkit-text-stroke: 1px var(--piece-dark-outline); }
+.report-tree-section button:focus-visible, .report-tree-section a:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { .report-tree-section *, .report-tree-section *::before, .report-tree-section *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 @media (max-width: 560px) {
   .report-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -21,4 +65,12 @@
   .report-import-summary { align-items: start; padding: 12px; font-size: 12px; }
   .report-import-state { max-width: 48%; }
   .report-import-content { padding: 13px; }
+  .report-tree-heading { align-items: start; flex-direction: column; }
+  .report-tree-controls { align-items: stretch; }
+  .report-tree-controls > * { max-width: 100%; }
+  .report-tree-card { padding: 6px; }
+  .report-tree-label { font-size: 7px; }
+  .report-tree-detail { padding: 12px; }
+  .report-tree-view-layout.has-selection { display: block; }
+  .report-tree-view-layout .report-tree-detail { position: fixed; z-index: 20; right: 10px; bottom: 10px; left: 10px; max-height: min(60vh, 520px); margin: 0; box-shadow: var(--card-shadow); }
 }
