@@ -16,6 +16,7 @@ import { detectLeaks } from './leaks.js';
 import { summarizeFirstBigMistakes } from './firstBigMistake.js';
 import { ReportHelpProvider } from './ReportHelpDrawer.jsx';
 import { LessonsProvider, LessonsSection } from './LessonsFeature.jsx';
+import ReportThemeControl from './ReportThemeControl.jsx';
 
 function countLabel(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -122,7 +123,7 @@ export default function ReportPage() {
     <div className="background-shapes" aria-hidden="true"><span className="shape-circle"/><span className="shape-slab"/><span className="shape-block"/></div>
     <header className="topbar report-topbar">
       <a className="brand" href="#top" aria-label="ChessFlow Live home"><img className="brand-mark" src="/assets/chessflow-logo.png" alt=""/><span>CHESSFLOW <b>LIVE</b></span></a>
-      <a className="button button-outline" href="#top">Back to ChessFlow Live</a>
+      <div className="report-topbar-actions"><ReportThemeControl/><a className="button button-outline" href="#top">Back to ChessFlow Live</a></div>
     </header>
 
     <section className="hero report-hero" aria-labelledby="report-title">

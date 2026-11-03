@@ -1,5 +1,9 @@
 .report-page { min-height: 100dvh; }
 .report-topbar { justify-content: space-between; }
+.report-topbar-actions { display: flex; align-items: center; gap: 12px; }
+.report-theme-control { min-width: 112px; }
+.report-theme-control select { min-height: 38px; padding: 6px 10px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); color: var(--text); box-shadow: var(--control-shadow); font: inherit; }
+.report-theme-control select:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
 .top-actions { position: relative; }
 .report-nav-entry { position: absolute; top: 50%; left: calc(100% + 24px); transform: translateY(-50%); }
 .report-hero { padding-bottom: 20px; }
@@ -52,6 +56,9 @@
 .report-first-mistake-card li { margin-top: 5px; overflow-wrap: anywhere; }
 .report-footer { margin-top: 38px; }
 @media (max-width: 560px) {
+  .report-topbar-actions { gap: 6px; }
+  .report-theme-control { min-width: 86px; font-size: 10px; }
+  .report-theme-control select { min-height: 34px; padding: 5px; font-size: 10px; }
   .top-actions .report-nav-entry { min-height: 34px; padding: 6px 7px; font-size: 9px; }
   .report-import-form { align-items: stretch; }
   .report-import-form .setting-select { flex-basis: 100%; }

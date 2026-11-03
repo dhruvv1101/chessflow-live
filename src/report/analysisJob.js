@@ -137,6 +137,18 @@ export function createGameAnalyzer({
     const cancelFromCaller = () => cancel();
     signal?.addEventListener('abort', cancelFromCaller, { once: true });
     const work = [];
+    const cachedGames = new Map();
+    for (const game of games) {
+      if (!cache.getGame || !game.url) continue;
+      try {
+        const cached = await cache.getGame(game.url, depth);
+        const moves = game.moves || [];
+        const isComplete = Array.isArray(cached) && cached.length === moves.length && cached.every((row, index) =>
+          row.gameKey === game.url && row.ply === moves[index].ply && row.playedUci === moves[index].uci
+          && row.fenBefore === moves[index].fenBefore && row.fenAfter === moves[index].fenAfter);
+        if (isComplete) cachedGames.set(game.url, cached);
+      } catch { /* A missing or unreadable game cache falls back to position analysis. */ }
+    }
     for (const game of games) {
       const moves = game.moves || [];
       const averages = new Map();
@@ -147,11 +159,13 @@ export function createGameAnalyzer({
         averages.set(move.color, samples);
       }
       const averageTimes = new Map([...averages].map(([color, values]) => [color, values.reduce((sum, value) => sum + value, 0) / values.length]));
+      if (cachedGames.has(game.url)) continue;
       for (const move of moves) if (move.color === 'w' || move.color === 'b') work.push({ game, move, color: move.color, averageSpentSeconds: averageTimes.get(move.color) });
     }
     const rows = [];
+    const cachedMoveCount = [...cachedGames.values()].reduce((sum, gameRows) => sum + gameRows.length, 0);
     try {
-      onProgress({ completed: 0, total: work.length, gameIndex: 0, ply: 0 });
+      onProgress({ completed: cachedMoveCount, total: work.length + cachedMoveCount, gameIndex: cachedGames.size, ply: 0 });
       for (let index = 0; index < work.length; index += 1) {
         await awaitRunnable();
         const { game, move, color, averageSpentSeconds } = work[index];
@@ -208,9 +222,12 @@ export function createGameAnalyzer({
           tacticTags: moveCaptureTags,
           depth: Math.min(before.depth, after.depth), nodes: before.nodes + after.nodes,
         });
-        onProgress({ completed: index + 1, total: work.length, gameIndex: games.indexOf(game) + 1, ply: move.ply });
+        onProgress({ completed: cachedMoveCount + index + 1, total: work.length + cachedMoveCount, gameIndex: games.indexOf(game) + 1, ply: move.ply });
         if (yieldMs > 0) await new Promise((resolve) => setTimeout(resolve, yieldMs));
       }
+      const computedRows = rows.slice();
+      rows.splice(0, rows.length, ...games.flatMap((game) => cachedGames.get(game.url)
+        || computedRows.filter((row) => row.gameKey === game.url)));
       for (let index = 1; index < rows.length; index += 1) {
         const previous = rows[index - 1];
         const current = rows[index];
@@ -229,6 +246,7 @@ export function createGameAnalyzer({
       }
       if (cache.putGame) {
         for (const game of games) {
+          if (cachedGames.has(game.url)) continue;
           try { await cache.putGame(game.url, depth, rows.filter((row) => row.gameKey === game.url)); }
           catch { /* Results remain available in memory if local persistence is unavailable. */ }
         }

@@ -103,6 +103,26 @@ describe('resumable report game analysis', () => {
     analyzer.dispose();
   });
 
+  it('reuses complete per-game analysis from IndexedDB without searching again', async () => {
+    const cache = fakeCache();
+    const search = vi.fn(async (fen) => ({
+      score: { cp: 0, mate: null }, bestMoveUci: fen === game.moves[0].fenBefore ? 'e2e4' : 'e7e5',
+      pvUci: [], depth: 10, nodes: 20,
+    }));
+    const firstVisit = createGameAnalyzer({ search, cache, depth: 10, yieldMs: 0 });
+    const firstRows = await firstVisit.analyzeGames([game]);
+    firstVisit.dispose();
+    search.mockClear();
+
+    const returnVisit = createGameAnalyzer({ search, cache, depth: 10, yieldMs: 0 });
+    const returnedRows = await returnVisit.analyzeGames([game]);
+
+    expect(returnedRows).toEqual(firstRows);
+    expect(cache.getGame).toHaveBeenCalledWith(game.url, 10);
+    expect(search).not.toHaveBeenCalled();
+    returnVisit.dispose();
+  });
+
   it('marks a missed chance when the opponent blunders and the user misses the best reply', async () => {
     const chess = new Chess();
     const moves = [];

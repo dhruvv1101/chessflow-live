@@ -20,6 +20,7 @@ import { saveLocalGame } from './cloud/savedGames.js';
 import { classifyGame, loadOpeningDatabase } from './openings.js';
 import { setLiveGameActive } from './report/analysisCoordinator.js';
 import { REPORT_PRACTICE_EVENT } from './report/practiceBridge.js';
+import { REPORT_THEME_CHANGED } from './report/reportSettings.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -159,6 +160,12 @@ function App() {
     media?.addEventListener?.('change', apply);
     return () => media?.removeEventListener?.('change', apply);
   }, [settings.theme, settings.reduceMotion]);
+
+  useEffect(() => {
+    const syncSettings = () => setSettings(loadSettings());
+    window.addEventListener(REPORT_THEME_CHANGED, syncSettings);
+    return () => window.removeEventListener(REPORT_THEME_CHANGED, syncSettings);
+  }, []);
 
   const changeSettings = (patch) => {
     const next = saveSettings({ ...settings, ...patch });
