@@ -113,9 +113,9 @@ function makeTree(tree, color, maxDepth, minimumSampleGames, showLowConfidence) 
     const data = {
       ...node,
       label: moveLabel(node.move),
-      lineBefore,
+      lineBefore: node.commonPathDisplay ? node.commonPathDisplay.split(' ').filter(Boolean) : lineBefore,
       pathIds: [...(edge ? [edge.source] : []), node.id],
-      lastMoveUci: edge?.opponentResponseUci || edge?.opponentReplyUci || null,
+      lastMoveUci: node.commonPathLastMoveUci || edge?.opponentResponseUci || edge?.opponentReplyUci || null,
       openingChanged,
     };
     data.children = (childrenByParent.get(node.id) || [])

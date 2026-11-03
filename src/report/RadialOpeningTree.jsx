@@ -233,15 +233,16 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
             </details>
           </div>
           {selected && <aside className="folder-card report-tree-detail" aria-label="Selected position details">
-            <div className="report-tree-detail-heading"><div><p className="meta-line">{selected.eco || 'PLY ' + (selected.depthPly ?? selected.depth)}</p><h4>{selected.openingName || selected.label || selected.name}</h4></div><button className="button button-outline" type="button" onClick={() => setSelectedId(null)} aria-label="Close position details">Close</button></div>
+            <div className="report-tree-detail-heading"><div><p className="meta-line">PLY {selected.movePly ?? selected.depthPly ?? selected.depth} · {selected.label || ''}{selected.eco ? ' · ' + selected.eco : ''}</p><h4>{selected.openingName || selected.label || selected.name}</h4></div><button className="button button-outline" type="button" onClick={() => setSelectedId(null)} aria-label="Close position details">Close</button></div>
             <p className="report-tree-sequence" aria-label="Moves leading to this position">{selected.lineBefore && selected.lineBefore.length ? selected.lineBefore.join(' ') : 'Start position'}</p>
+            {selected.pathTransposed && <p className="small-meta">Most common path ({selected.pathGameCount} of {selected.games} games).</p>}
             <ReadOnlyFen fen={selected.positionKey + ' 0 1'} color={color} lastMoveUci={selected.lastMoveUci}/>
             <p>You reached this position in {selected.games} {selected.games === 1 ? 'game' : 'games'} and won {selected.wins}. After your moves here, your winning chances changed by {Number.isFinite(selected.averageWinProbabilityChange) ? (selected.averageWinProbabilityChange >= 0 ? '+' : '') + Math.round(selected.averageWinProbabilityChange * 100) + ' points' : 'an unknown amount'} on average. {Math.round((selected.mistakeRate || 0) * 100)}% of your moves from here were flagged.</p>
             <p>Results: {selected.wins} wins, {selected.draws} draws and {selected.losses} losses.</p>
             {touchingLeaks.length > 0 && <div><strong>Related leaks</strong><ul>{touchingLeaks.map((leak) => <li key={leak.id}>{leak.title}</li>)}</ul></div>}
             <div><strong>Example games</strong><ul>{selected.exampleGameIds && selected.exampleGameIds.map((gameId) => <li key={gameId}><a href="#report-games-title" onClick={(event) => { event.preventDefault(); onShowGames && onShowGames(gameId); document.getElementById('report-games-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }}>Show game {gameId}</a></li>)}</ul></div>
             {(onSaveLesson || openLesson) && <button className="button button-outline" type="button" onClick={() => (onSaveLesson || openLesson)({ kind: 'position', color, normalizedFen: selected.positionKey, openingName: selected.openingName, openingKey: selected.positionKey, tags: ['opening-position'], sourceGameIds: selected.exampleGameIds || [] })}>Save as lesson</button>}
-            <button className="button button-outline" type="button" disabled aria-describedby="report-training-next">Train this line</button><p id="report-training-next" className="small-meta">Training arrives in the next update.</p>
+            {limits.trainingEnabled && <button className="button button-outline" type="button">Train this line</button>}
           </aside>}
           </div>
         </>}

@@ -40,6 +40,7 @@ test('save, edit, export, import and delete a local report lesson', async ({ pag
   await editor.getByLabel('My note').fill('Check the center first.');
   await editor.getByRole('button', { name: 'Save lesson' }).click();
   await expect(page.getByRole('heading', { name: 'Saved lessons (1/15)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Practice this' })).toHaveCount(0);
   const downloadWait = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export lessons' }).click();
   const download = await downloadWait;

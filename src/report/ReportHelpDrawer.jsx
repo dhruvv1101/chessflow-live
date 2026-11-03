@@ -25,6 +25,7 @@ export function buildReportHelpItems(limits) {
     ['Missed chance', 'Your opponent just made a mistake and your reply did not take advantage of it.'],
     ['Time labels', 'Instant move, long think, low clock and normal pace are estimates from the clock and are marked likely.'],
     ['Analysis depth', `How deep Stockfish searched (${limits.analysisDepth} in the free version). Deeper analysis is usually more accurate but slower.`],
+    ['Leak totals and ranking', 'Leak cards rank by score (occurrences multiplied by total winning-chance points lost). One move can appear in more than one leak category, so points lost across leaks overlap and are not additive.'],
   ];
 }
 

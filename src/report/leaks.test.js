@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLeaks } from './leaks.js';
+import { detectLeaks, rankLeaks } from './leaks.js';
 
 const game = (url, result = '0-1') => ({ url, result, userColor: 'white', moves: Array.from({ length: 6 }, (_, index) => ({ color: index % 2 ? 'b' : 'w' })) });
 const row = (gameKey, overrides = {}) => ({
@@ -10,6 +10,9 @@ const row = (gameKey, overrides = {}) => ({
 });
 
 describe('report leak detection', () => {
+  it('ranks leak cards by score, then frequency, for numbered presentation', () => {
+    expect(rankLeaks([{ id: 'small', score: 0.2, frequency: 9 }, { id: 'large', score: 0.5, frequency: 2 }]).map((leak) => leak.id)).toEqual(['large', 'small']);
+  });
   it('ranks repeated bad moves by frequency times summed expected-score loss', () => {
     const games = [game('g1'), game('g2'), game('g3')];
     const rows = [row('g1'), row('g2'), row('g3', { playedUci: 'a2a3', playedSan: 'a3', positionKey: 'other', winProbabilityLoss: 0.2 })];

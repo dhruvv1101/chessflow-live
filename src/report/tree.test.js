@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
+import { buildRadialLayout } from './radialLayout.js';
 import openings from '../../public/data/openings.json';
 import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 
@@ -42,6 +43,33 @@ describe('report opening position tree', () => {
     expect(nodes[0].exampleGameIds).toEqual(['game-a', 'game-b']);
     expect(nodes[0]).toMatchObject({ depthPly: 4, move: 'Bg2' });
     expect(tree.children.flatMap((color) => color.children).find((node) => node.positionKey === key)).toEqual(nodes[0]);
+  });
+
+  it('uses the most common legal played path and the actual move ply for a transposed node', () => {
+    const games = [
+      makeGame('path-a', ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4', 'Nxd4', 'Nf6', 'Nc3', 'a6', 'Bd2'], '1-0'),
+      makeGame('path-b', ['e4', 'c5', 'Nc3', 'd6', 'Nf3', 'Nf6', 'd4', 'cxd4', 'Nxd4', 'a6', 'Bd2'], '1/2-1/2'),
+      makeGame('path-c', ['e4', 'c5', 'Nf3', 'd6', 'd4', 'cxd4', 'Nxd4', 'Nf6', 'Nc3', 'a6', 'Bd2'], '0-1'),
+    ];
+    const rows = games.map((game) => ({ gameKey: game.url, ply: 11, fenBefore: game.moves[10].fenBefore, isUserMove: true, playedSan: 'Bd2', notation: '6. Bd2' }));
+    const result = buildOpeningTree(games, rows);
+    const selected = result.nodes.find((entry) => entry.positionKey === games[0].moves[10].fenBefore.split(' ').slice(0, 4).join(' '));
+    expect(selected.movePly).toBe(11);
+    expect(selected.pathTransposed).toBe(true);
+    expect(selected.pathGameCount).toBe(2);
+    const replay = new Chess(selected.commonPathStartFen);
+    for (const san of selected.commonPathSans) replay.move(san);
+    expect(replay.fen().split(' ').slice(0, 4)).toEqual(selected.positionKey.split(' '));
+    expect(selected.commonPathDisplay).toBe('1.e4 c5 2.Nf3 d6 3.d4 cxd4 4.Nxd4 Nf6 5.Nc3 a6');
+    for (const node of result.nodes) {
+      const replayed = new Chess(node.commonPathStartFen);
+      for (const san of node.commonPathSans) replayed.move(san);
+      expect(replayed.fen().split(' ').slice(0, 4), node.commonPathDisplay).toEqual(node.positionKey.split(' '));
+      expect(node.commonPathSans.length + 1).toBe(node.movePly);
+    }
+    const displayed = buildRadialLayout(result, { showLowConfidence: true, maxDepth: 12 }).nodes.find((entry) => entry.positionKey === selected.positionKey);
+    expect(displayed.movePly).toBe(11);
+    expect(displayed.lineBefore.join(' ')).toBe(selected.commonPathDisplay);
   });
 
   it('applies minimum sample and low-confidence thresholds and summarizes named openings', () => {

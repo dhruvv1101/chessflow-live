@@ -46,6 +46,22 @@ test('game reports show evaluation markers, explanations, and tree-linked game f
   await expect(page.getByRole('group', { name: 'Game win probability graph, from your perspective' })).toBeVisible();
   const marker = page.locator('.report-eval-marker').first();
   await expect(marker).toBeVisible();
+  const markerGeometry = await marker.evaluate((group) => {
+    const expected = { x: Number(group.dataset.x), y: Number(group.dataset.y) };
+    const shape = group.querySelector('circle, rect, path');
+    const tag = shape.tagName.toLowerCase();
+    const actual = tag === 'circle'
+      ? { x: Number(shape.getAttribute('cx')), y: Number(shape.getAttribute('cy')) }
+      : tag === 'rect'
+        ? { x: Number(shape.getAttribute('x')) + Number(shape.getAttribute('width')) / 2, y: Number(shape.getAttribute('y')) + Number(shape.getAttribute('height')) / 2 }
+        : (() => { const parts = shape.getAttribute('d').match(/-?[\d.]+/g).map(Number); return { x: parts[0], y: parts[1] + 8 }; })();
+    return { expected, actual, shape: tag, svgWidth: group.ownerSVGElement.getBoundingClientRect().width, gameCardWidth: group.closest('.report-game-card').getBoundingClientRect().width };
+  });
+  expect(markerGeometry.actual.x).toBe(markerGeometry.expected.x);
+  expect(markerGeometry.actual.y).toBe(markerGeometry.expected.y);
+  expect(markerGeometry.svgWidth).toBeGreaterThan(markerGeometry.gameCardWidth * 0.85);
+  await expect(page.locator('.report-eval-legend .is-inaccuracy')).toBeVisible();
+  await expect(page.locator('.report-eval-legend .is-mistake')).toHaveCSS('border-radius', '0px');
   await marker.focus();
   await page.keyboard.press('Enter');
   await expect(page.getByText('What happened?').first()).toBeVisible();

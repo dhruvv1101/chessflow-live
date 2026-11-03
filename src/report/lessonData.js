@@ -57,7 +57,7 @@ export function lessonDraftFromRow(row, game, extra = {}) {
   };
 }
 
-export function suggestLessons(games, rows, { maxSuggestions = 5 } = {}) {
+export function suggestLessons(games, rows, { maxSuggestions = 5, leaks = [] } = {}) {
   const grouped = new Map();
   for (const row of rows || []) {
     if (!row.isUserMove || !['Inaccuracy', 'Mistake', 'Blunder'].includes(row.classification)) continue;
@@ -68,11 +68,18 @@ export function suggestLessons(games, rows, { maxSuggestions = 5 } = {}) {
     item.sourceGameIds.add(row.gameKey);
     grouped.set(key, item);
   }
-  return [...grouped.values()].map((item) => ({
+  const patterns = (leaks || []).map((leak) => {
+    const example = leak.examples?.[0];
+    if (!example?.row || !leak.frequency || leak.frequency < 2) return null;
+    const draft = lessonDraftFromRow(example.row, games.find((game) => game.url === example.gameId), { kind: 'leak', source: 'suggested', tags: [...(example.row.tacticTags || []).map((tag) => tag.kind), leak.id] });
+    return { ...draft, id: `pattern:${leak.id}`, suggestionType: 'pattern', title: leak.title, repeatCount: leak.frequency, pointsLost: leak.expectedScoreLoss || 0, gameCount: leak.gamesAffected || new Set((leak.examples || []).map((entry) => entry.gameId)).size, score: leak.score || leak.frequency * (leak.expectedScoreLoss || 0), sourceGameIds: [...new Set((leak.examples || []).map((entry) => entry.gameId))] };
+  }).filter(Boolean);
+  const individualBlunders = [...grouped.values()].filter((item) => item.count === 1 && item.row.classification === 'Blunder').map((item) => ({
     ...lessonDraftFromRow(item.row, games.find((game) => game.url === item.row.gameKey), { source: 'suggested' }),
-    id: item.key, repeatCount: item.count, pointsLost: item.pointsLost,
-    sourceGameIds: [...item.sourceGameIds], score: item.count * item.pointsLost,
-  })).sort((a, b) => b.score - a.score).slice(0, maxSuggestions);
+    id: item.key, suggestionType: 'single', repeatCount: 1, pointsLost: item.pointsLost,
+    sourceGameIds: [...item.sourceGameIds], score: item.pointsLost,
+  })).sort((a, b) => b.score - a.score);
+  return [...patterns.sort((a, b) => b.score - a.score), ...individualBlunders].slice(0, maxSuggestions);
 }
 
 export function matchLesson(lesson, row, game, { openingKey = null } = {}) {

@@ -125,5 +125,9 @@ export function detectLeaks(games, rows, {
     if (leak) leaks.push(leak);
   }
 
-  return leaks.sort((a, b) => b.score - a.score || b.frequency - a.frequency || a.title.localeCompare(b.title)).slice(0, topN);
+  return rankLeaks(leaks).slice(0, topN);
+}
+
+export function rankLeaks(leaks = []) {
+  return [...leaks].sort((a, b) => b.score - a.score || b.frequency - a.frequency || a.title.localeCompare(b.title));
 }

@@ -32,11 +32,22 @@ describe('lesson data helpers', () => {
 
   it('ranks repeated mistakes by repeats times points lost and exports an importable payload', () => {
     const games = [game, { url: 'game-b', userColor: 'white' }];
-    const suggestions = suggestLessons(games, [row(), row({ gameKey: 'game-b', winProbabilityLoss: 0.3 }), row({ classification: 'Good', gameKey: 'game-b' })]);
+    const repeatedRows = [row(), row({ gameKey: 'game-b', winProbabilityLoss: 0.3 }), row({ classification: 'Good', gameKey: 'game-b' })];
+    const suggestions = suggestLessons(games, repeatedRows, { leaks: [{ id: 'opening:repeat', title: 'Repeated e4 blunder', frequency: 2, expectedScoreLoss: 0.52, examples: [{ gameId: 'game-a', row: repeatedRows[0] }] }] });
     expect(suggestions[0]).toMatchObject({ repeatCount: 2, pointsLost: 0.52, source: 'suggested' });
     const payload = lessonExportPayload([{ id: 'one', ...suggestions[0], normalizedFen: row().fenBefore }]);
     expect(validateLessonImport(payload)).toHaveLength(1);
     expect(normalizeLessonFen(row().fenBefore)).toBe(row().fenBefore.split(' ').slice(0, 4).join(' '));
+  });
+
+  it('puts repeated leak patterns before individual blunders and excludes single non-blunders', () => {
+    const games = [game, { url: 'game-b', userColor: 'white' }];
+    const suggestions = suggestLessons(games, [row(), row({ gameKey: 'game-b', ply: 3, playedSan: 'Nf3', winProbabilityLoss: 0.12, classification: 'Mistake' })], {
+      leaks: [{ id: 'tactical:missed', title: 'Missed capture pattern', frequency: 3, expectedScoreLoss: 0.48, examples: [{ gameId: 'game-a', row: row() }] }],
+    });
+    expect(suggestions[0]).toMatchObject({ suggestionType: 'pattern', repeatCount: 3, title: 'Missed capture pattern' });
+    expect(suggestions.some((item) => item.playedMove === 'Nf3')).toBe(false);
+    expect(suggestions[1]).toMatchObject({ suggestionType: 'single', repeatCount: 1, playedMove: 'e4' });
   });
 
   it('uses “likely” in heuristic context and does not fabricate a cause', () => {

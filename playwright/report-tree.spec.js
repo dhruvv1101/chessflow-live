@@ -16,11 +16,13 @@ async function assertTreeContrast(page) {
       nodeStroke: contrast(getComputedStyle(svg.querySelector('.report-tree-node circle')).stroke, surface),
       line: contrast(getComputedStyle(svg.querySelector('.report-tree-link')).stroke, surface),
       ring: contrast(getComputedStyle(svg.querySelector('.report-tree-ring')).stroke, surface),
+      openingLabel: svg.querySelector('.report-tree-opening-label') ? contrast(getComputedStyle(svg.querySelector('.report-tree-opening-label')).fill, surface) : 5,
     };
   });
   expect(ratios.nodeStroke).toBeGreaterThanOrEqual(3);
   expect(ratios.line).toBeGreaterThanOrEqual(3);
   expect(ratios.ring).toBeGreaterThanOrEqual(3);
+  expect(ratios.openingLabel).toBeGreaterThanOrEqual(4.5);
 }
 
 test('radial tree fits mobile and desktop, responds to keyboard and theme tokens', async ({ page }) => {
@@ -84,8 +86,16 @@ test('radial tree fits mobile and desktop, responds to keyboard and theme tokens
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('complementary', { name: 'Selected position details' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Train this line' })).toHaveCount(0);
   await expect(page.getByRole('grid', { name: /Position preview/ })).toBeVisible();
-  await expect(page.getByText(/1\.e4 1\.\.\.e5/)).toBeVisible();
+  await expect(page.getByText(/1\.e4 e5/)).toBeVisible();
+  const squareDimensions = await page.locator('.report-fen-board').evaluate((board) => {
+    const cells = [...board.querySelectorAll('.report-fen-square')].map((cell) => cell.getBoundingClientRect());
+    return { widths: cells.map((cell) => cell.width), heights: cells.map((cell) => cell.height) };
+  });
+  expect(Math.max(...squareDimensions.widths) - Math.min(...squareDimensions.widths)).toBeLessThanOrEqual(1);
+  expect(Math.max(...squareDimensions.heights) - Math.min(...squareDimensions.heights)).toBeLessThanOrEqual(1);
+  await expect(page.locator('.report-tree-detail .meta-line')).toContainText('PLY 3 · 2.Nf3');
 
   const lightRoot = await page.locator('.report-tree-node circle').first().evaluate((element) => getComputedStyle(element).fill);
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; document.documentElement.dataset.effectiveTheme = 'dark'; });

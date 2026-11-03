@@ -1,14 +1,9 @@
 import { useMemo, useState } from 'react';
 import EvalGraph from './EvalGraph.jsx';
-import { filterGamesByIds, resultFromUserSide } from './gameReportData.js';
+import { filterGamesByIds, gameOpening, resultFromUserSide } from './gameReportData.js';
 
 function formatDate(timestamp) {
   return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
-}
-
-function gameOpening(game, rows) {
-  const contextual = rows.filter((row) => row.gameKey === game.url && row.openingContext?.name).at(-1)?.openingContext;
-  return game.opening || contextual?.name || null;
 }
 
 export default function ReportGames({ games, totalGames = games.length, rows, analysisStatus, loadingStorage, storageError, busy, selectedGameIds, onClearFilter, onDelete }) {
@@ -38,7 +33,7 @@ export default function ReportGames({ games, totalGames = games.length, rows, an
               return <article className={`folder-card report-game-card${isSelected ? ' is-selected' : ''}`} id={`report-game-${index}`} key={game.url}>
                 <p className="meta-line">{formatDate(game.endTime)} · {String(game.timeClass || 'unknown').toUpperCase()}</p>
                 <h3>{game.headers.White || 'White'} vs {game.headers.Black || 'Black'}</h3>
-                <p className="small-meta">Opponent: {opponent || 'Unknown'} · You played {game.userColor || 'unknown side'} · Result: {resultFromUserSide(game)} · Opening: {opening ? `${game.eco ? `${game.eco} · ` : ''}${opening}` : 'No named opening'} · {game.moves.length} plies</p>
+                <p className="small-meta">Opponent: {opponent || 'Unknown'} · You played {game.userColor || 'unknown side'} · Result: {resultFromUserSide(game)} · Opening: {opening.label} · {game.moves.length} plies</p>
                 <button className="button button-outline" type="button" aria-expanded={isSelected} aria-controls={panelId} onClick={() => setSelectedUrl(isSelected ? null : game.url)}>{isSelected ? 'Close game analysis' : 'Analyze game'}</button>
                 {isSelected && <div id={panelId} className="report-game-analysis-panel" aria-label={`Analysis for ${game.headers.White || 'White'} versus ${game.headers.Black || 'Black'}`}>
                   {rows.some((row) => row.gameKey === game.url) ? <EvalGraph game={game} rows={rows}/> : <p className="small-meta" role="status">Move analysis is not ready for this game yet.</p>}

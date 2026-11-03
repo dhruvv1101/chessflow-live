@@ -1,4 +1,5 @@
 import { FREE_LIMITS } from './config.js';
+import { Chess } from 'chess.js';
 
 const FLAGGED = new Set(['Inaccuracy', 'Mistake', 'Blunder']);
 
@@ -16,6 +17,24 @@ function gameScoreForUser(game) {
 function mean(values) {
   const finite = values.filter(Number.isFinite);
   return finite.length ? finite.reduce((sum, value) => sum + value, 0) / finite.length : null;
+}
+
+function playedPath(game, beforePly) {
+  const moves = (game.moves || []).filter((move) => Number(move.ply) < Number(beforePly)).sort((a, b) => a.ply - b.ply);
+  const startFen = moves[0]?.fenBefore || game.startFen || undefined;
+  const chess = new Chess(startFen);
+  const sans = [];
+  const display = [];
+  for (const [index, stored] of moves.entries()) {
+    const before = chess.fen().split(' ');
+    const move = chess.move(stored.san || stored.playedSan);
+    if (!move) throw new Error(`Stored game path is illegal at ply ${stored.ply}.`);
+    sans.push(move.san);
+    if (move.color === 'w') display.push(`${before[5] || '1'}.${move.san}`);
+    else if (index === 0) display.push(`${before[5] || '1'}...${move.san}`);
+    else display.push(move.san);
+  }
+  return { sans, display: display.join(' '), startFen: startFen || new Chess().fen(), lastMoveUci: moves.at(-1)?.uci || null };
 }
 
 function opponentReplyNotation(row) {
@@ -95,10 +114,18 @@ export function buildOpeningTree(games, rows, {
         openingPlyCount: opening?.matchedPly ?? opening?.plyCount ?? null,
         positions: 0, _gameIds: new Set(), _results: new Map(), _changes: [], _drops: [], _gaps: [], _mistakes: 0, _times: [],
         _openingContexts: [], _openingGambits: [],
+        _pathCounts: new Map(), movePly: Number(row.ply) || null,
       };
       positions.set(id, node);
     }
     node.positions += 1;
+    node.movePly = Number(row.ply) || node.movePly;
+    const path = playedPath(game, row.ply);
+    const pathKey = `${path.startFen}|${path.sans.join(' ')}`;
+    const pathRecord = node._pathCounts.get(pathKey) || { ...path, count: 0, gameIds: new Set(), movePly: Number(row.ply) || null };
+    pathRecord.gameIds.add(game.url);
+    pathRecord.count = pathRecord.gameIds.size;
+    node._pathCounts.set(pathKey, pathRecord);
     const result = gameScoreForUser(game);
     node._gameIds.add(game.url);
     if (!node._results.has(game.url) && result != null) node._results.set(game.url, result);
@@ -128,13 +155,22 @@ export function buildOpeningTree(games, rows, {
     const resultsByGameId = Object.fromEntries(node._results);
     const scores = [...node._results.values()];
     const gamesCount = node._gameIds.size;
+    const commonPath = [...node._pathCounts.values()].sort((a, b) => b.count - a.count || a.display.localeCompare(b.display))[0];
     return {
-      id: node.id, positionKey: node.positionKey, color: node.color, depthPly: node.depthPly, move: node.move,
+      id: node.id, positionKey: node.positionKey, color: node.color, depthPly: commonPath?.sans.length ?? node.depthPly, move: node.move,
       name: node.name, openingName: node.openingName, eco: node.eco, openingPlyCount: node.openingPlyCount,
       games: gamesCount, wins: scores.filter((score) => score === 1).length,
       draws: scores.filter((score) => score === 0.5).length,
       losses: scores.filter((score) => score === 0).length,
       positions: node.positions,
+      movePly: commonPath?.movePly ?? node.movePly,
+      commonPathSans: commonPath?.sans || [],
+      commonPathDisplay: commonPath?.display || '',
+      commonPathStartFen: commonPath?.startFen || new Chess().fen(),
+      commonPathLastMoveUci: commonPath?.lastMoveUci || null,
+      pathGameCount: Math.max(0, ...[...node._pathCounts.values()].map((path) => path.count)),
+      pathVariantCount: node._pathCounts.size,
+      pathTransposed: node._pathCounts.size > 1,
       averageWinProbabilityChange: mean(node._changes),
       averageWinProbabilityLoss: mean(node._drops),
       expectedScoreGap: mean(node._gaps),

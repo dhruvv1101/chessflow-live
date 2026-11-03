@@ -11,5 +11,6 @@ describe('report help copy', () => {
     expect(items['Analysis depth']).toContain(`${FREE_LIMITS.analysisDepth}`);
     expect(items['Inaccuracy / Mistake / Blunder']).toContain(`${FREE_LIMITS.lossThresholds.blunder * 100}`);
     expect(items['Lost advantage']).toContain(`${FREE_LIMITS.lostAdvantage.minimumBeforeWinProbability * 100}`);
+    expect(items['Leak totals and ranking']).toContain('not additive');
   });
 });
