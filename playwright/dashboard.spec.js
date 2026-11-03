@@ -56,6 +56,10 @@ test('pieces retain consistent rendered styles after e2-e4 and the AI reply', as
   await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 8 });
   await page.mouse.up();
   await expect(page.locator('.count-badge')).toHaveText('2 ply', { timeout: 30_000 });
+  await expect.poll(async () => page.locator('.board-wrap [data-piece]').evaluateAll((pieces) => pieces.every((element) => {
+    const svg = element.querySelector('svg');
+    return svg && getComputedStyle(element).opacity === '1' && getComputedStyle(element).filter === 'none';
+  })), { timeout: 10_000 }).toBe(true);
 
   const styles = await page.locator('.board-wrap [data-piece]').evaluateAll((pieces) => pieces.map((element) => {
     const svg = element.querySelector('svg');

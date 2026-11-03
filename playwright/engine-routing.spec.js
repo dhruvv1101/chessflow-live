@@ -43,6 +43,20 @@ test('falls back visibly to browser engine when server returns 503', async ({ pa
 test('falls back visibly to browser engine when mocked server health and analysis fail', async ({ page }) => {
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error.message));
+  await page.addInitScript(() => {
+    window.Worker = class MockFallbackWorker {
+      postMessage(message) {
+        if (message === 'uci') queueMicrotask(() => { this.onmessage?.({ data: 'id name Stockfish 19 Test' }); this.onmessage?.({ data: 'uciok' }); });
+        else if (message === 'isready') queueMicrotask(() => this.onmessage?.({ data: 'readyok' }));
+        else if (String(message).startsWith('position fen ')) this.fen = String(message).slice('position fen '.length);
+        else if (String(message).startsWith('go ')) queueMicrotask(() => {
+          this.onmessage?.({ data: 'info depth 12 score cp 20 nodes 120 pv e2e4' });
+          this.onmessage?.({ data: 'bestmove e2e4' });
+        });
+      }
+      terminate() {}
+    };
+  });
   await page.route('**/health', (route) => route.abort('failed'));
   await page.route('**/analyze', (route) => route.abort('failed'));
   await page.route('**/engine/stockfish-19-single.js', (route) => route.abort('failed'));
