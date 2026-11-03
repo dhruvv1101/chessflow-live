@@ -68,7 +68,7 @@ describe('report analysis summary', () => {
 
   it('includes a missed chance as a tagged row without changing the mistake categories', () => {
     const row = { isUserMove: true, classification: 'Good', missedChance: { confidence: 'likely' } };
-    expect(filterAnalysisRows([row])).toEqual([row]);
+    expect(filterAnalysisRows([row])).toEqual([]);
     expect(filterAnalysisRows([row], 'Mistake')).toEqual([]);
   });
 });

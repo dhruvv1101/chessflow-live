@@ -116,7 +116,7 @@ describe('resumable report game analysis', () => {
       [moves[0].fenBefore, 0],
       [moves[0].fenAfter, 0],
       [moves[1].fenAfter, 250],
-      [moves[2].fenAfter, 180],
+      [moves[2].fenAfter, 100],
     ]);
     const bestMoves = new Map([
       [moves[0].fenBefore, 'e2e4'],
@@ -135,6 +135,29 @@ describe('resumable report game analysis', () => {
     expect(rows[1]).toMatchObject({ isUserMove: false, classification: 'Blunder' });
     expect(rows[2]).toMatchObject({ isUserMove: true, playedSan: 'Nf3', bestMoveSan: 'd4', missedChance: { confidence: 'likely', opponentMoveNotation: '1... e5', opponentMoveClassification: 'Blunder' } });
     expect(rows[2].evaluationBefore.userScore.cp).toBe(250);
+    analyzer.dispose();
+  });
+
+  it('does not attach a missed-chance tag to a Good reply', async () => {
+    const chess = new Chess();
+    const moves = [];
+    for (const san of ['e4', 'e5', 'Nf3']) {
+      const fenBefore = chess.fen();
+      const move = chess.move(san);
+      moves.push({ ply: moves.length + 1, color: move.color, san: move.san, uci: `${move.from}${move.to}`, fenBefore, fenAfter: move.after });
+    }
+    const scores = new Map([[moves[0].fenBefore, 0], [moves[0].fenAfter, 0], [moves[1].fenAfter, 250], [moves[2].fenAfter, 240]]);
+    const bestMoves = new Map([[moves[0].fenBefore, 'e2e4'], [moves[0].fenAfter, 'd7d5'], [moves[1].fenAfter, 'd2d4'], [moves[2].fenAfter, 'b8c6']]);
+    const search = vi.fn(async (fen) => ({
+      score: { cp: (fen.split(/\s+/)[1] === 'b' ? -1 : 1) * scores.get(fen), mate: null },
+      bestMoveUci: bestMoves.get(fen), pvUci: [], depth: 10, nodes: 10,
+    }));
+    const analyzer = createGameAnalyzer({ search, cache: fakeCache(), depth: 10, yieldMs: 0 });
+    const rows = await analyzer.analyzeGames([{ ...game, moves }]);
+
+    expect(rows[1].classification).toBe('Blunder');
+    expect(rows[2].classification).toBe('Good');
+    expect(rows[2]).not.toHaveProperty('missedChance');
     analyzer.dispose();
   });
 

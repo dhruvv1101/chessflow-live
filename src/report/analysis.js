@@ -82,10 +82,11 @@ export function timeContext({ spentSeconds, remainingSeconds, averageSpentSecond
 }
 
 export function hasLostAdvantage(beforeScore, afterScore, thresholds = FREE_LIMITS.lostAdvantage) {
-  if (beforeScore?.mate > 0 && (afterScore?.mate == null || afterScore.mate <= 0)) return true;
-  if (beforeScore?.cp == null || beforeScore.cp < thresholds.minimumBeforeCp) return false;
-  if (afterScore?.mate < 0) return true;
-  return afterScore?.cp != null && beforeScore.cp - afterScore.cp >= thresholds.minimumDropCp;
+  const beforeWinProbability = winProbabilityFromPlayerScore(beforeScore);
+  const afterWinProbability = winProbabilityFromPlayerScore(afterScore);
+  if (beforeScore?.mate > 0 && (afterScore?.mate <= 0 || afterWinProbability < thresholds.maximumAfterWinProbability)) return true;
+  return beforeWinProbability >= thresholds.minimumBeforeWinProbability
+    && afterWinProbability < thresholds.maximumAfterWinProbability;
 }
 
 function winProbabilityFromPlayerScore(score) {
@@ -137,10 +138,45 @@ export function likelyTactic({ beforeFen, afterFen, bestMoveUci, opponentRespons
   return { kind: 'missed_opponent_threat', confidence: 'likely', basis: 'engine_evaluation_drop' };
 }
 
-export function likelyCaptureTag({ playedMove, afterFen, opponentResponseUci, lossCp }) {
-  if (!Number.isFinite(lossCp) || lossCp <= 0) return null;
-  if (playedMove?.isCapture?.()) return { kind: 'capture', confidence: 'likely', basis: 'capture-with-engine-loss' };
-  const response = chessMoveFromUci(afterFen, opponentResponseUci);
-  if (response?.isCapture()) return { kind: 'capture', confidence: 'likely', basis: 'opponent-capture-response' };
-  return null;
+function materialBalance(fen, color) {
+  const chess = new Chess(fen);
+  const values = { p: 1, n: 3, b: 3, r: 5, q: 9 };
+  return chess.board().flat().reduce((balance, piece) => {
+    if (!piece || piece.type === 'k') return balance;
+    return balance + values[piece.type] * (piece.color === color ? 1 : -1);
+  }, 0);
+}
+
+function isMaterialWinningCapture(afterFen, responseUci, pvUci = []) {
+  const chess = new Chess(afterFen);
+  const opponentColor = chess.turn();
+  const beforeBalance = materialBalance(afterFen, opponentColor);
+  const response = chessMoveFromUci(afterFen, responseUci);
+  if (!response?.isCapture()) return false;
+  chess.move({ from: response.from, to: response.to, promotion: response.promotion });
+  const line = pvUci[0]?.toLowerCase() === responseUci?.toLowerCase() ? pvUci.slice(1) : [];
+  if (line[0]) {
+    try { chess.move({ from: line[0].slice(0, 2), to: line[0].slice(2, 4), promotion: line[0][4] }); } catch { /* a short line still supports an immediate capture tag */ }
+  }
+  return materialBalance(chess.fen(), opponentColor) > beforeBalance;
+}
+
+export function captureTags({ beforeFen, afterFen, playedUci, bestMoveUci, opponentResponseUci, opponentResponsePvUci = [], lossCp }) {
+  if (!Number.isFinite(lossCp) || lossCp <= 0) return [];
+  const tags = [];
+  const playedMove = chessMoveFromUci(beforeFen, playedUci);
+  const bestMove = chessMoveFromUci(beforeFen, bestMoveUci);
+  if (playedMove?.isCapture()) tags.push({
+    kind: 'played-capture-lost-value', confidence: 'likely',
+    description: 'The played move is a capture and the engine marks it as a mistake or worse.',
+  });
+  if (bestMove?.isCapture() && playedUci?.toLowerCase() !== bestMoveUci?.toLowerCase()) tags.push({
+    kind: 'missed-capture', confidence: 'likely',
+    description: 'The engine’s best move is a legal capture, but a different move was played.',
+  });
+  if (isMaterialWinningCapture(afterFen, opponentResponseUci, opponentResponsePvUci)) tags.push({
+    kind: 'allowed-capture-hung-piece', confidence: 'likely',
+    description: 'The engine’s best reply captures material and remains ahead after its next principal-variation move.',
+  });
+  return tags;
 }

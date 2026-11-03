@@ -40,7 +40,7 @@ function gameTitle(game) {
 
 export function filterAnalysisRows(rows, filter = 'all', showOpponentMoves = false) {
   const visible = rows.filter((row) => (row.isUserMove || showOpponentMoves)
-    && (FLAGGED_CLASSES.includes(row.classification) || row.missedChance)
+    && FLAGGED_CLASSES.includes(row.classification)
     && !isOpeningNoise(row));
   return visible.filter((row) => filter === 'all'
     || (filter === 'lost-advantage' ? row.lostAdvantage : row.classification === filter));
@@ -85,7 +85,7 @@ export default function AnalysisSummary({ games, rows }) {
               <thead><tr><th scope="col">Move</th><th scope="col">Flag</th><th scope="col">Best move</th><th scope="col">Eval before</th><th scope="col">Eval after</th><th scope="col">Phase</th><th scope="col">Time spent (likely)</th><th scope="col">Clock remaining</th><th scope="col">Time context</th><th scope="col">Opponent context</th></tr></thead>
               <tbody>{flagged.map((row) => <tr key={`${row.gameKey}-${row.ply}`}>
                 <th scope="row">{row.notation || `Move ${row.fullmove} ${row.playedSan}`}</th>
-                <td>{row.classification}{row.lostAdvantage && <span className="report-lost-advantage"> · Lost advantage</span>}{row.tacticTags?.some((tag) => tag.kind === 'capture') && <span> · Capture · likely</span>}{row.missedChance && <span> · Missed chance · likely</span>}</td>
+                <td>{row.classification}{row.lostAdvantage && <span className="report-lost-advantage"> · Lost advantage</span>}{row.tacticTags?.map((tag) => <span key={tag.kind} title={tag.description} aria-label={`${tag.kind}: ${tag.description}`}> · {tag.kind === 'played-capture-lost-value' ? 'Played capture that lost value' : tag.kind === 'missed-capture' ? 'Missed capture' : 'Allowed capture / hung piece'} · likely</span>)}{row.missedChance && <span> · Missed chance · likely</span>}</td>
                 <td>{row.bestMoveSan || '—'}</td>
                 <td>{formatEvaluation(row.evaluationBefore?.userScore)}</td>
                 <td>{formatEvaluation(row.evaluationAfter?.userScore)}</td>

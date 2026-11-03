@@ -8,7 +8,7 @@ describe('free report entitlement', () => {
       maxGames: 25, analysisDepth: 10,
       lossThresholds: { inaccuracy: 0.05, mistake: 0.15, blunder: 0.25 },
       openingNoiseMinWinProbabilityLoss: 0.08,
-      lostAdvantage: { minimumBeforeCp: 200, minimumDropCp: 100 },
+      lostAdvantage: { minimumBeforeWinProbability: 0.8, maximumAfterWinProbability: 0.65 },
       bestMoveMarginCp: 25,
       timeContext: {
         instantMoveBaseRatio: 0.003,

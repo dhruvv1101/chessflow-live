@@ -4,7 +4,7 @@ export const FREE_LIMITS = Object.freeze({
   lossThresholds: Object.freeze({ inaccuracy: 0.05, mistake: 0.15, blunder: 0.25 }),
   openingNoiseMinWinProbabilityLoss: 0.08,
   bestMoveMarginCp: 25,
-  lostAdvantage: Object.freeze({ minimumBeforeCp: 200, minimumDropCp: 100 }),
+  lostAdvantage: Object.freeze({ minimumBeforeWinProbability: 0.8, maximumAfterWinProbability: 0.65 }),
   timeContext: Object.freeze({
     instantMoveBaseRatio: 0.003,
     longThinkClockRatio: 0.25,

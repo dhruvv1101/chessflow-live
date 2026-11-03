@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { classifyMoveLoss, compareMoveLoss, gamePhase, likelyCaptureTag, likelyTactic, normalizeAnalysisFen, parseClockSeconds, timeContext, winProbability, hasLostAdvantage } from './analysis.js';
+import { captureTags, classifyMoveLoss, compareMoveLoss, gamePhase, likelyTactic, normalizeAnalysisFen, parseClockSeconds, timeContext, winProbability, hasLostAdvantage } from './analysis.js';
 
 describe('report move analysis helpers', () => {
   it('normalizes whitespace while preserving all FEN fields', () => {
@@ -52,9 +52,11 @@ describe('report move analysis helpers', () => {
 
   it('detects a lost advantage using configurable player-perspective thresholds', () => {
     expect(hasLostAdvantage({ cp: 250 }, { cp: 100 })).toBe(true);
-    expect(hasLostAdvantage({ cp: 190 }, { cp: 0 })).toBe(false);
-    expect(hasLostAdvantage({ cp: 500 }, { cp: 450 })).toBe(false);
-    expect(hasLostAdvantage({ mate: 2 }, { cp: 500 })).toBe(true);
+    expect(hasLostAdvantage({ cp: 418 }, { cp: 281 })).toBe(false);
+    expect(hasLostAdvantage({ cp: 555 }, { cp: 344 })).toBe(false);
+    expect(hasLostAdvantage({ cp: 400 }, { cp: 100 })).toBe(true);
+    expect(hasLostAdvantage({ mate: 2 }, { cp: 500 })).toBe(false);
+    expect(hasLostAdvantage({ mate: 3 }, { mate: -1 })).toBe(true);
   });
 
   it('labels tactical patterns as likely and ties them to legal engine moves', () => {
@@ -69,11 +71,26 @@ describe('report move analysis helpers', () => {
       .toMatchObject({ kind: 'hung_piece', confidence: 'likely', basis: 'engine_reply_capture' });
   });
 
-  it('adds a likely capture tag only when a flagged capture loses or allows a capture tactic', () => {
-    const before = new Chess('q3k3/8/8/8/8/8/8/R3K3 w - - 0 1');
-    const capture = before.move('Rxa8+');
-    expect(likelyCaptureTag({ playedMove: capture, afterFen: before.fen(), opponentResponseUci: null, lossCp: 80 }))
-      .toMatchObject({ kind: 'capture', confidence: 'likely' });
-    expect(likelyCaptureTag({ playedMove: capture, afterFen: before.fen(), opponentResponseUci: null, lossCp: 0 })).toBeNull();
+  it('distinguishes a played capture that loses value from a missed capture', () => {
+    const fen = 'q3k3/8/8/8/8/8/8/R3K3 w - - 0 1';
+    const played = new Chess(fen);
+    played.move('Rxa8+');
+    expect(captureTags({ beforeFen: fen, playedUci: 'a1a8', bestMoveUci: 'a1a8', lossCp: 80 }))
+      .toEqual([{ kind: 'played-capture-lost-value', confidence: 'likely', description: 'The played move is a capture and the engine marks it as a mistake or worse.' }]);
+
+    const missed = new Chess(fen);
+    missed.move('Kd1');
+    expect(captureTags({ beforeFen: fen, playedUci: 'e1d1', bestMoveUci: 'a1a8', lossCp: 80 }))
+      .toContainEqual(expect.objectContaining({ kind: 'missed-capture', confidence: 'likely' }));
+  });
+
+  it('tags only a legal engine reply that wins material as an allowed capture', () => {
+    const fen = '4k3/8/8/8/8/8/P5q1/4K2R w - - 0 1';
+    const played = new Chess(fen);
+    played.move('a3');
+    expect(captureTags({ beforeFen: fen, playedUci: 'a2a3', bestMoveUci: 'e1d1', afterFen: played.fen(), opponentResponseUci: 'g2h1', opponentResponsePvUci: ['g2h1'], lossCp: 300 }))
+      .toContainEqual(expect.objectContaining({ kind: 'allowed-capture-hung-piece', confidence: 'likely' }));
+
+    expect(captureTags({ beforeFen: fen, playedUci: 'a2a3', bestMoveUci: 'a2a3', afterFen: played.fen(), opponentResponseUci: null, lossCp: 0 })).toEqual([]);
   });
 });

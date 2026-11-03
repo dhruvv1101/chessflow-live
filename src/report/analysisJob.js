@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic, likelyCaptureTag, hasLostAdvantage, compareMoveLoss } from './analysis.js';
+import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic, captureTags, hasLostAdvantage, compareMoveLoss } from './analysis.js';
 import { reportAnalysisCache } from './analysisCache.js';
 import { subscribeLiveGameActive } from './analysisCoordinator.js';
 import { createStockfishSearch } from './stockfishSearch.js';
@@ -177,7 +177,11 @@ export function createGameAnalyzer({
         });
         const fullmove = Number(move.fenBefore.split(/\s+/)[5]) || Math.ceil(move.ply / 2);
         const isFlagged = ['Inaccuracy', 'Mistake', 'Blunder'].includes(classification);
-        const captureTag = isFlagged ? likelyCaptureTag({ playedMove: applied, afterFen: move.fenAfter, opponentResponseUci: after.bestMoveUci, lossCp: moveLoss.lossCp }) : null;
+        const moveCaptureTags = isFlagged ? captureTags({
+          beforeFen: move.fenBefore, afterFen: move.fenAfter, playedUci: move.uci,
+          bestMoveUci: before.bestMoveUci, opponentResponseUci: after.bestMoveUci,
+          opponentResponsePvUci: after.pvUci, lossCp: moveLoss.lossCp,
+        }) : [];
         rows.push({
           gameKey: game.url, ply: move.ply,
           fullmove,
@@ -198,7 +202,7 @@ export function createGameAnalyzer({
           timeContextConfidence: moveTimeContext.confidence,
           tactic: isFlagged
             ? likelyTactic({ beforeFen: move.fenBefore, afterFen: move.fenAfter, bestMoveUci: before.bestMoveUci, opponentResponseUci: after.bestMoveUci, beforePlayerScore: moverBeforeScore }) : null,
-          tacticTags: captureTag ? [captureTag] : [],
+          tacticTags: moveCaptureTags,
           depth: Math.min(before.depth, after.depth), nodes: before.nodes + after.nodes,
         });
         onProgress({ completed: index + 1, total: work.length, gameIndex: games.indexOf(game) + 1, ply: move.ply });
@@ -209,7 +213,8 @@ export function createGameAnalyzer({
         const current = rows[index];
         const opponentMadeMistake = ['Mistake', 'Blunder'].includes(previous.classification);
         if (current.isUserMove && current.gameKey === previous.gameKey && current.ply === previous.ply + 1
-          && !previous.isUserMove && opponentMadeMistake && current.evaluationLossCp > 0) {
+          && !previous.isUserMove && opponentMadeMistake && current.evaluationLossCp > 0
+          && ['Inaccuracy', 'Mistake', 'Blunder'].includes(current.classification)) {
           current.missedChance = {
             confidence: 'likely',
             opponentMoveNotation: previous.notation,
