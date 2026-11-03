@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FREE_LIMITS } from './config.js';
 import { buildRadialLayout, moveTreeSelection, visibleTreeTable } from './radialLayout.js';
 
@@ -23,7 +23,7 @@ function describe(node) {
   return `${node.move || node.name}, ${node.games} games, ${node.wins}-${node.draws}-${node.losses}, average win probability change ${Number.isFinite(node.averageWinProbabilityChange) ? `${Math.round(node.averageWinProbabilityChange * 100)} percentage points` : 'unavailable'}, mistake rate ${Math.round((node.mistakeRate || 0) * 100)} percent`;
 }
 
-export default function RadialOpeningTree({ tree, leaks = [], status = 'ready', onShowGames }) {
+export default function RadialOpeningTree({ tree, leaks = [], highlightedPositionKeys = [], status = 'ready', onShowGames }) {
   const [color, setColor] = useState('white');
   const [maxDepth, setMaxDepth] = useState(12);
   const [showLowConfidence, setShowLowConfidence] = useState(false);
@@ -31,9 +31,17 @@ export default function RadialOpeningTree({ tree, leaks = [], status = 'ready', 
   const [selectedId, setSelectedId] = useState(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [drag, setDrag] = useState(null);
+  const lastHighlightRef = useRef('');
   const layout = useMemo(() => buildRadialLayout(tree, { color, maxDepth, showLowConfidence }), [tree, color, maxDepth, showLowConfidence]);
   const tableNodes = useMemo(() => visibleTreeTable(layout), [layout]);
   const selected = layout.nodes.find((node) => node.id === selectedId) || null;
+  useEffect(() => {
+    if (!highlightedPositionKeys.length) { lastHighlightRef.current = null; return; }
+    if (lastHighlightRef.current === highlightedPositionKeys) return;
+    lastHighlightRef.current = highlightedPositionKeys;
+    const highlight = tree?.nodes?.find((node) => highlightedPositionKeys.includes(node.positionKey));
+    if (highlight && highlight.color !== color) setColor(highlight.color);
+  }, [highlightedPositionKeys, tree, color]);
   const maxLinkGames = Math.max(1, ...layout.links.map((link) => link.games));
   const touchingLeaks = selected ? leaks.filter((leak) => leak.examples?.some((example) => example.row?.positionKey === selected.positionKey || example.row?.fenBefore?.split(' ').slice(0, 4).join(' ') === selected.positionKey)) : [];
   const renderTreeRows = (parentId = null) => {
@@ -82,9 +90,10 @@ export default function RadialOpeningTree({ tree, leaks = [], status = 'ready', 
                 {layout.links.map((link, index) => <line key={`${link.source.id}:${link.target.id}:${index}`} x1={link.source.x} y1={link.source.y} x2={link.target.x} y2={link.target.y} className="report-tree-link" strokeWidth={1 + 5 * Math.sqrt(link.games / maxLinkGames)} aria-hidden="true"><title>{`${link.move}: ${link.games} games`}</title></line>)}
                 {layout.nodes.map((node) => {
                   const isLeak = leaks.some((leak) => leak.examples?.some((example) => example.row?.positionKey === node.positionKey || example.row?.fenBefore?.split(' ').slice(0, 4).join(' ') === node.positionKey));
+                  const isHighlighted = highlightedPositionKeys.includes(node.positionKey);
                   const isMajor = node.games >= FREE_LIMITS.reportInsights.lowConfidenceGames;
                   return <g key={node.id} className="report-tree-node" role="button" tabIndex={node.depth ? 0 : -1} data-tree-node={node.id} aria-label={describe(node)} aria-pressed={selectedId === node.id} onClick={() => setSelectedId(node.id)} onKeyDown={(event) => selectByKeyboard(event, node)}>
-                    <circle cx={node.x} cy={node.y} r={node.radius} fill={node.fill} className={`${node.lowConfidence ? 'is-low-confidence' : ''} ${isLeak ? 'is-leak' : ''} ${selectedId === node.id ? 'is-selected' : ''}`}/>
+                    <circle cx={node.x} cy={node.y} r={node.radius} fill={node.fill} className={`${node.lowConfidence ? 'is-low-confidence' : ''} ${isLeak ? 'is-leak' : ''} ${isHighlighted ? 'is-highlighted' : ''} ${selectedId === node.id ? 'is-selected' : ''}`}/>
                     <title>{describe(node)}</title>
                     {isMajor && node.openingName && <text x={node.x + node.radius + 4} y={node.y - 3} className="report-tree-label">{node.eco} · {node.openingName}</text>}
                     {isLeak && <circle cx={node.x + node.radius * .72} cy={node.y - node.radius * .72} r="3" className="report-tree-leak-marker" aria-hidden="true"/>}
@@ -100,7 +109,7 @@ export default function RadialOpeningTree({ tree, leaks = [], status = 'ready', 
             <p>Games {selected.games} · W/D/L {selected.wins}/{selected.draws}/{selected.losses}</p>
             <p>Average win-probability change: {Number.isFinite(selected.averageWinProbabilityChange) ? `${Math.round(selected.averageWinProbabilityChange * 100)} percentage points` : 'unavailable'} · Mistake rate {Math.round((selected.mistakeRate || 0) * 100)}%</p>
             {touchingLeaks.length > 0 && <div><strong>Related leaks</strong><ul>{touchingLeaks.map((leak) => <li key={leak.id}>{leak.title}</li>)}</ul></div>}
-            <div><strong>Example games</strong><ul>{selected.exampleGameIds?.map((gameId) => <li key={gameId}><a href="#report-games-title" onClick={() => onShowGames?.(gameId)}>Show game {gameId}</a></li>)}</ul></div>
+            <div><strong>Example games</strong><ul>{selected.exampleGameIds?.map((gameId) => <li key={gameId}><a href="#report-games-title" onClick={(event) => { event.preventDefault(); onShowGames?.(gameId); document.getElementById('report-games-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); }}>Show game {gameId}</a></li>)}</ul></div>
             <button className="button button-outline" type="button" disabled aria-describedby="report-training-next">Train this line</button><p id="report-training-next" className="small-meta">Training arrives in the next update.</p>
           </aside>}
           </div>

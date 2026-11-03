@@ -54,7 +54,7 @@ test('imports public standard games locally and fits in both themes', async ({ p
     await expect(page.getByRole('heading', { name: 'Filters' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Opening tree' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Leaks' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Imported games' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Games', exact: true })).toBeVisible();
     await expect(page.getByText('Your report starts here')).toBeVisible();
     await page.getByLabel('Chess.com username').fill('TestPlayer');
     await page.getByRole('button', { name: 'Import games' }).click();
@@ -66,7 +66,7 @@ test('imports public standard games locally and fits in both themes', async ({ p
     await expect(page.getByText(/PGN has headers and a result but no moves.*Termination: Opponent won by resignation/)).toBeVisible();
     await expect(page.getByText('TestPlayer vs Opponent')).toBeVisible();
     await page.getByRole('button', { name: 'Black' }).click();
-    await expect(page.locator('.report-games-section').getByText('No games match the current filters.')).toBeVisible();
+    await expect(page.locator('.report-games-section').getByText('No games match the current filters or selection.')).toBeVisible();
     await page.getByRole('button', { name: 'White' }).click();
     await expect(page.getByText('TestPlayer vs Opponent')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-effective-theme', theme);

@@ -8,15 +8,12 @@ import { clearAnalysisCache } from './analysisCache.js';
 import AnalysisProgress from './AnalysisProgress.jsx';
 import ReportInsights from './ReportInsights.jsx';
 import ReportFilters from './ReportFilters.jsx';
+import ReportGames from './ReportGames.jsx';
 import { filterReportData } from './filters.js';
 import { loadOpeningDatabase } from '../openings.js';
 import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 import { detectLeaks } from './leaks.js';
 import { summarizeFirstBigMistakes } from './firstBigMistake.js';
-
-function formatDate(timestamp) {
-  return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
-}
 
 function countLabel(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -45,6 +42,7 @@ export default function ReportPage() {
   const [importReasons, setImportReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [selectedGameIds, setSelectedGameIds] = useState(null);
   const controllerRef = useRef(null);
 
   const handleAnalysisComplete = useCallback((rows) => { setAnalysisRows(rows); setImportStatusOpen(false); }, []);
@@ -114,7 +112,7 @@ export default function ReportPage() {
 
   const deleteImportedData = async () => {
     setError(''); setMessage('');
-    try { await Promise.all([clearReportGames(), clearAnalysisCache()]); setGames([]); setAnalysisRows([]); setMessage('Imported game data deleted from this browser.'); }
+    try { await Promise.all([clearReportGames(), clearAnalysisCache()]); setGames([]); setAnalysisRows([]); setSelectedGameIds(null); setMessage('Imported game data deleted from this browser.'); }
     catch { setError('Could not delete imported game data from this browser.'); }
   };
 
@@ -163,18 +161,10 @@ export default function ReportPage() {
       firstMistakes={insights?.firstMistakes || { gamesLost: 0, gamesWithFirstMistake: 0, entries: [] }}
       openingStatus={!filtered.games.length ? 'empty' : openingStatus === 'error' ? 'error' : openingStatus === 'ready' ? 'ready' : 'loading'}
       leaksStatus={!filtered.games.length ? 'empty' : analysisStatus === 'error' ? 'error' : !filtered.rows.length ? 'loading' : 'ready'}
+      onFilterGames={setSelectedGameIds}
     />
 
-    <section className="report-games-section" aria-labelledby="report-games-title">
-      <div className="section-heading"><div><p className="meta-line">SAVED ON THIS DEVICE</p><h2 id="report-games-title">Imported games</h2></div><button className="button button-outline" type="button" onClick={deleteImportedData} disabled={busy || !games.length}>Delete my imported data</button></div>
-      {loading ? <p className="folder-card report-empty" role="status">Loading local games…</p> : storageError ? <p className="folder-card report-empty" role="alert">{storageError}</p> : filtered.games.length ? <>{analysisStatus === 'running' && <p className="folder-card report-empty" role="status">Game list is ready while move analysis continues.</p>}<div className="report-game-list">
-        {filtered.games.map((game) => <article className="folder-card report-game-card" key={game.url}>
-          <p className="meta-line">{formatDate(game.endTime)} · {game.timeClass}</p>
-          <h3>{game.headers.White || 'White'} vs {game.headers.Black || 'Black'}</h3>
-          <p className="small-meta">You played {game.userColor || 'unknown side'} · {game.result}{game.eco ? ` · ${game.eco}${game.opening ? ` ${game.opening}` : ''}` : ''} · {game.moves.length} plies</p>
-        </article>)}
-      </div></> : games.length ? <p className="folder-card report-empty" role="status">No games match the current filters.</p> : <div className="folder-card report-empty"><p className="meta-line">NO IMPORTED GAMES</p><h3>Your report starts here</h3><p className="small-meta">Import recent public games above. Games are saved in this browser; the proxy does not retain game records.</p></div>}
-    </section>
+    <ReportGames games={filtered.games} totalGames={games.length} rows={insights?.analysisRows || []} analysisStatus={analysisStatus} loadingStorage={loading} storageError={storageError} busy={busy} selectedGameIds={selectedGameIds} onClearFilter={() => setSelectedGameIds(null)} onDelete={deleteImportedData}/>
 
     <footer className="site-footer report-footer"><span><img className="footer-mark" src="/assets/chessflow-logo.png" alt=""/> ChessFlow Live</span><span>Not affiliated with Chess.com.</span></footer>
   </main>;

@@ -67,14 +67,14 @@ export function buildRadialLayout(tree, {
     return {
       ...entry.data, parentId: entry.parent?.depth > 0 ? entry.parent.data.id : null, depth: level, depthPly: ply, x: point.x, y: point.y,
       radius: level === 0 ? 9 : nodeRadius(entry.data.games || 0, maxGames),
-      fill: level === 0 ? 'var(--purple)' : nodePerformanceToken(entry.data.averageWinProbabilityChange),
+      fill: level === 0 ? 'var(--purple)' : nodePerformanceToken(entry.data.expectedScoreGap ?? entry.data.averageWinProbabilityChange),
     };
   });
   const pointById = new Map(radialNodes.map((node) => [node.id, node]));
   const radialLinks = root.links().filter((link) => link.target.depth <= visibleDepth).map((link) => ({
     source: pointById.get(link.source.data.id), target: pointById.get(link.target.data.id),
     move: link.target.data._edge?.move || link.target.data.move,
-    games: link.target.data.games || 1,
+    games: link.target.data._edge?.games || 1,
   })).filter((link) => link.source && link.target);
   return {
     nodes: radialNodes, links: radialLinks,

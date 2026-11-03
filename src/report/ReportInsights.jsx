@@ -24,7 +24,7 @@ function ExplanationDetails({ explanation }) {
   </div>;
 }
 
-function LeakCard({ leak }) {
+function LeakCard({ leak, onShowTree, onFilterGames }) {
   const [openExample, setOpenExample] = useState(null);
   const [explanation, setExplanation] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -42,10 +42,16 @@ function LeakCard({ leak }) {
     finally { setLoading(false); }
   };
 
+  const firstExample = leak.examples?.[0];
+
   return <article className="folder-card report-insight-card">
     <p className="meta-line">{leak.kind.replaceAll('-', ' ').toUpperCase()}</p>
     <h3>{leak.title}</h3>
     <p className="small-meta">{lossSummary(leak)} across {leak.gamesAffected} games.</p>
+    <div className="report-leak-actions">
+      {firstExample && <button className="button button-outline" type="button" aria-expanded={openExample === `${firstExample.gameId}:${firstExample.ply}`} onClick={() => explain(firstExample)}>Explain</button>}
+      <button className="button button-outline" type="button" onClick={() => { onShowTree(leak); onFilterGames(leak.examples.map((example) => example.gameId)); }}>Show on tree</button>
+    </div>
     {leak.lowConfidence && <span className="review-badge badge-peach report-confidence-badge">Low confidence · fewer than 3 games</span>}
     {leak.kind === 'conversion' && <p className="small-meta">Average lost-advantage swing: {formatChange(leak.averageSwing)}.</p>}
     {leak.kind === 'missed-chance' && <p className="small-meta">Examples include time spent on your reply.</p>}
@@ -67,7 +73,13 @@ function LeakCard({ leak }) {
   </article>;
 }
 
-export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, openingStatus = 'ready', leaksStatus = 'ready' }) {
+export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, openingStatus = 'ready', leaksStatus = 'ready', onFilterGames = () => {} }) {
+  const [highlightedPositionKeys, setHighlightedPositionKeys] = useState([]);
+  const showLeakOnTree = (leak) => {
+    const keys = leak.examples.map((example) => example.row?.positionKey || example.row?.fenBefore?.split(' ').slice(0, 4).join(' ')).filter(Boolean);
+    setHighlightedPositionKeys(keys);
+    document.getElementById('report-radial-tree-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
   const openingTable = (color, title) => {
     const items = openingRows.filter((opening) => opening.color === color);
     return <section className="report-insight-section" aria-label={`${title} opening performance`}>
@@ -84,7 +96,7 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, tree
   return <section className="report-insights" aria-labelledby="report-insights-title">
     <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div></div>
     <section className="report-insight-section" aria-labelledby="report-opening-table-title">
-      <RadialOpeningTree tree={tree} leaks={leaks} status={openingStatus}/>
+      <RadialOpeningTree tree={tree} leaks={leaks} highlightedPositionKeys={highlightedPositionKeys} status={openingStatus} onShowGames={(gameId) => onFilterGames([gameId])}/>
       <h3 id="report-opening-table-title">Opening performance</h3>
       {openingStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Opening tree is being prepared…</p>
         : openingStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Opening names are unavailable. Your imported games remain saved.</p>
@@ -98,7 +110,7 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, tree
       {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Stockfish analysis is in progress…</p>
         : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Stockfish analysis failed. Your imported games are still saved; retry by refreshing this report.</p>
         : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
-          : leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak}/>)}</div>
+          : leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak} onShowTree={showLeakOnTree} onFilterGames={onFilterGames}/>)}</div>
             : <p className="folder-card report-insight-empty">No recurring leaks yet. Patterns need at least two games.</p>}
     </section>
     <section className="report-insight-section" aria-labelledby="report-first-mistake-title">

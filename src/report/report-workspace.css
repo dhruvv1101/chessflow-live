@@ -34,6 +34,7 @@
 .report-tree-node circle { stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
 .report-tree-node circle.is-low-confidence { stroke: var(--divider); stroke-dasharray: 3 3; }
 .report-tree-node circle.is-leak { stroke: var(--pink); stroke-width: 3; }
+.report-tree-node circle.is-highlighted { stroke: var(--lime); stroke-width: 4; }
 .report-tree-node circle.is-selected, .report-tree-node:focus-visible circle { stroke: var(--yellow); stroke-width: 4; }
 .report-tree-node .report-tree-leak-marker { fill: var(--pink); stroke: var(--surface); stroke-width: 1.5; }
 .report-tree-label { fill: var(--text); font: inherit; font-size: 9px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
@@ -57,6 +58,30 @@
 .report-fen-square.piece-white { color: var(--white-fill); -webkit-text-stroke: 1px var(--piece-white-outline, var(--outline)); }
 .report-fen-square.piece-black { color: var(--piece-dark-fill); -webkit-text-stroke: 1px var(--piece-dark-outline); }
 .report-tree-section button:focus-visible, .report-tree-section a:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 2px; }
+.report-games-actions, .report-leak-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-game-card.is-selected { outline: 3px solid var(--purple); outline-offset: 2px; }
+.report-game-analysis-panel { min-width: 0; margin-top: 16px; padding-top: 12px; border-top: var(--line); }
+.report-eval-wrap { min-width: 0; }
+.report-eval-heading h4 { margin: 0 0 3px; }
+.report-eval-heading p { margin-top: 0; }
+.report-eval-graph { display: block; width: 100%; max-height: 320px; overflow: visible; border: var(--line); border-radius: var(--card-radius); background: var(--surface-alt); }
+.report-eval-grid { stroke: var(--divider); stroke-width: 1; opacity: .45; }
+.report-eval-even { stroke: var(--neutral, var(--grey)); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.report-eval-axis { fill: var(--grey); font: inherit; font-size: 9px; }
+.report-eval-line { fill: none; stroke: var(--lime); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.report-eval-marker { cursor: pointer; outline: none; }
+.report-eval-marker circle { stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.report-eval-marker:focus-visible circle { stroke: var(--focus-color, var(--pink)); stroke-width: 4; }
+.report-eval-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 8px 0; color: var(--text); font-size: 10px; font-weight: 800; }
+.report-eval-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.report-eval-legend i { width: 12px; height: 12px; border: 2px solid var(--outline); border-radius: 50%; }
+.report-eval-legend .is-inaccuracy { background: var(--yellow); }
+.report-eval-legend .is-mistake { background: var(--amber, var(--peach)); }
+.report-eval-legend .is-blunder { background: var(--pink); }
+.report-eval-legend .is-even { border-style: dashed; background: var(--surface-alt); }
+.report-eval-explanation { margin-top: 10px; padding: 12px; }
+.report-eval-explanation h5 { margin: 4px 0; }
+.report-games-count { margin: 0 0 10px; }
 @media (prefers-reduced-motion: reduce) { .report-tree-section *, .report-tree-section *::before, .report-tree-section *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 @media (max-width: 560px) {
@@ -73,4 +98,6 @@
   .report-tree-detail { padding: 12px; }
   .report-tree-view-layout.has-selection { display: block; }
   .report-tree-view-layout .report-tree-detail { position: fixed; z-index: 20; right: 10px; bottom: 10px; left: 10px; max-height: min(60vh, 520px); margin: 0; box-shadow: var(--card-shadow); }
+  .report-games-actions { justify-content: flex-end; }
+  .report-eval-graph { max-height: 230px; }
 }
