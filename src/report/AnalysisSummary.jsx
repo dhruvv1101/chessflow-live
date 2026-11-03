@@ -38,18 +38,22 @@ function gameTitle(game) {
   return `${game.headers?.White || 'White'} vs ${game.headers?.Black || 'Black'}`;
 }
 
-export function filterAnalysisRows(rows, filter = 'all') {
-  const visible = rows.filter((row) => FLAGGED_CLASSES.includes(row.classification) && !isOpeningNoise(row));
+export function filterAnalysisRows(rows, filter = 'all', showOpponentMoves = false) {
+  const visible = rows.filter((row) => (row.isUserMove || showOpponentMoves)
+    && (FLAGGED_CLASSES.includes(row.classification) || row.missedChance)
+    && !isOpeningNoise(row));
   return visible.filter((row) => filter === 'all'
     || (filter === 'lost-advantage' ? row.lostAdvantage : row.classification === filter));
 }
 
 export default function AnalysisSummary({ games, rows }) {
   const [filter, setFilter] = useState('all');
+  const [showOpponentMoves, setShowOpponentMoves] = useState(false);
   if (!rows.length) return null;
 
-  const noisyOpeningInaccuracies = rows.filter((row) => FLAGGED_CLASSES.includes(row.classification) && isOpeningNoise(row)).length;
-  const visibleRows = filterAnalysisRows(rows);
+  const selectedScope = rows.filter((row) => row.isUserMove || showOpponentMoves);
+  const noisyOpeningInaccuracies = selectedScope.filter((row) => FLAGGED_CLASSES.includes(row.classification) && isOpeningNoise(row)).length;
+  const visibleRows = filterAnalysisRows(rows, 'all', showOpponentMoves);
   const counts = Object.fromEntries(FLAGGED_CLASSES.map((classification) => [classification, visibleRows.filter((row) => row.classification === classification).length]));
   counts['lost-advantage'] = visibleRows.filter((row) => row.lostAdvantage).length;
   const filterOptions = [
@@ -57,11 +61,12 @@ export default function AnalysisSummary({ games, rows }) {
     ...FLAGGED_CLASSES.map((classification) => ({ id: classification, label: classification, count: counts[classification] })),
     { id: 'lost-advantage', label: 'Lost advantage', count: counts['lost-advantage'] },
   ];
-  const selectedRows = filterAnalysisRows(rows, filter);
+  const selectedRows = filterAnalysisRows(rows, filter, showOpponentMoves);
 
   return <section className="report-progress report-analysis-summary" aria-labelledby="analysis-summary-title">
     <h2 id="analysis-summary-title">Analysis summary</h2>
-    <p>Stockfish reviewed every move. Evaluations are from the side-to-move’s perspective; elapsed-time values and context labels are likely estimates.</p>
+    <p>Stockfish reviewed every move. All evaluations are from your perspective; elapsed-time values and context labels are likely estimates.</p>
+    <label className="report-opponent-toggle"><input type="checkbox" checked={showOpponentMoves} onChange={(event) => setShowOpponentMoves(event.target.checked)}/> Show opponent moves</label>
     <div className="report-analysis-filters" role="group" aria-label="Filter analysis summary">
       {filterOptions.map((option) => <button key={option.id} className="button button-outline" type="button" aria-pressed={filter === option.id} onClick={() => setFilter(option.id)}>
         {option.label} ({option.count})
@@ -77,10 +82,10 @@ export default function AnalysisSummary({ games, rows }) {
           <p className="small-meta">Analyzed {allForGame.length} of {game.moves?.length || 0} moves.</p>
           {!flagged.length ? <p className="small-meta">No flagged moves for this filter.</p> : <div className="report-analysis-table-wrap">
             <table className="report-analysis-table">
-              <thead><tr><th scope="col">Move</th><th scope="col">Flag</th><th scope="col">Best move</th><th scope="col">Eval before</th><th scope="col">Eval after</th><th scope="col">Phase</th><th scope="col">Time spent (likely)</th><th scope="col">Clock remaining</th><th scope="col">Time context</th></tr></thead>
+              <thead><tr><th scope="col">Move</th><th scope="col">Flag</th><th scope="col">Best move</th><th scope="col">Eval before</th><th scope="col">Eval after</th><th scope="col">Phase</th><th scope="col">Time spent (likely)</th><th scope="col">Clock remaining</th><th scope="col">Time context</th><th scope="col">Opponent context</th></tr></thead>
               <tbody>{flagged.map((row) => <tr key={`${row.gameKey}-${row.ply}`}>
                 <th scope="row">{row.notation || `Move ${row.fullmove} ${row.playedSan}`}</th>
-                <td>{row.classification}{row.lostAdvantage && <span className="report-lost-advantage"> · Lost advantage</span>}</td>
+                <td>{row.classification}{row.lostAdvantage && <span className="report-lost-advantage"> · Lost advantage</span>}{row.tacticTags?.some((tag) => tag.kind === 'capture') && <span> · Capture · likely</span>}{row.missedChance && <span> · Missed chance · likely</span>}</td>
                 <td>{row.bestMoveSan || '—'}</td>
                 <td>{formatEvaluation(row.evaluationBefore?.userScore)}</td>
                 <td>{formatEvaluation(row.evaluationAfter?.userScore)}</td>
@@ -88,6 +93,7 @@ export default function AnalysisSummary({ games, rows }) {
                 <td>{formatSpent(row.timeSpentSeconds)}</td>
                 <td>{formatRemaining(row.clockRemainingSeconds)}</td>
                 <td>{row.timeContext === 'unknown' ? 'unknown' : `${row.timeContextConfidence === 'likely' ? 'likely · ' : ''}${row.timeContext}`}</td>
+                <td>{row.missedChance ? `Opponent ${row.missedChance.opponentMoveNotation} (${row.missedChance.opponentMoveClassification}); best reply ${row.missedChance.bestReplySan}, played ${row.missedChance.playedSan}.` : '—'}</td>
               </tr>)}</tbody>
             </table>
           </div>}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { classifyMoveLoss, gamePhase, likelyTactic, normalizeAnalysisFen, parseClockSeconds, timeContext, winProbability, hasLostAdvantage } from './analysis.js';
+import { classifyMoveLoss, compareMoveLoss, gamePhase, likelyCaptureTag, likelyTactic, normalizeAnalysisFen, parseClockSeconds, timeContext, winProbability, hasLostAdvantage } from './analysis.js';
 
 describe('report move analysis helpers', () => {
   it('normalizes whitespace while preserving all FEN fields', () => {
@@ -31,12 +31,23 @@ describe('report move analysis helpers', () => {
     expect(gamePhase('r4rk1/p1p1bppp/1pBqpn2/8/3P4/P1N1B3/1PPQ1PPP/R3K2R b KQ - 0 14', 28)).toBe('middlegame');
   });
 
-  it('derives likely time context and elapsed time from clock data', () => {
+  it('uses the game time control for time labels and calls ordinary pacing normal', () => {
     expect(parseClockSeconds('0:09:59.2')).toBeCloseTo(599.2);
-    expect(timeContext({ spentSeconds: 1.2, remainingSeconds: 300 })).toMatchObject({ label: 'instant move', confidence: 'likely' });
-    expect(timeContext({ spentSeconds: 45, remainingSeconds: 300, averageSpentSeconds: 15 })).toMatchObject({ label: 'long think', confidence: 'likely' });
-    expect(timeContext({ spentSeconds: 2, remainingSeconds: 20 })).toMatchObject({ label: 'low clock', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 0.2, remainingSeconds: 50, baseTimeSeconds: 60, timeClass: 'bullet' })).toMatchObject({ label: 'normal pace', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 0.05, remainingSeconds: 50, baseTimeSeconds: 60, timeClass: 'bullet' })).toMatchObject({ label: 'instant move', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 2, remainingSeconds: 6, baseTimeSeconds: 60, timeClass: 'bullet' })).toMatchObject({ label: 'low clock', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 45, remainingSeconds: 300, averageSpentSeconds: 15, baseTimeSeconds: 300, timeClass: 'blitz' })).toMatchObject({ label: 'long think', confidence: 'likely' });
     expect(timeContext({ spentSeconds: null, remainingSeconds: null })).toMatchObject({ label: 'unknown', confidence: null });
+  });
+
+  it('zeros the loss for the exact best move and moves within the configured centipawn margin', () => {
+    const before = { cp: 400, mate: null };
+    expect(compareMoveLoss({ playedUci: 'e2e4', bestMoveUci: 'e2e4', beforeWhiteScore: before, afterWhiteScore: { cp: -300, mate: null }, moverColor: 'white' }))
+      .toMatchObject({ lossCp: 0, winProbabilityLoss: 0, bestOrWithinMargin: true });
+    expect(compareMoveLoss({ playedUci: 'd2d4', bestMoveUci: 'e2e4', beforeWhiteScore: before, afterWhiteScore: { cp: 380, mate: null }, moverColor: 'white' }))
+      .toMatchObject({ lossCp: 0, winProbabilityLoss: 0, bestOrWithinMargin: true });
+    expect(compareMoveLoss({ playedUci: 'd2d4', bestMoveUci: 'e2e4', beforeWhiteScore: before, afterWhiteScore: { cp: 300, mate: null }, moverColor: 'white' }).lossCp)
+      .toBe(75);
   });
 
   it('detects a lost advantage using configurable player-perspective thresholds', () => {
@@ -56,5 +67,13 @@ describe('report move analysis helpers', () => {
     after.move('a3');
     expect(likelyTactic({ beforeFen: hangingFen, afterFen: after.fen(), bestMoveUci: 'e1d1', opponentResponseUci: 'g2h1' }))
       .toMatchObject({ kind: 'hung_piece', confidence: 'likely', basis: 'engine_reply_capture' });
+  });
+
+  it('adds a likely capture tag only when a flagged capture loses or allows a capture tactic', () => {
+    const before = new Chess('q3k3/8/8/8/8/8/8/R3K3 w - - 0 1');
+    const capture = before.move('Rxa8+');
+    expect(likelyCaptureTag({ playedMove: capture, afterFen: before.fen(), opponentResponseUci: null, lossCp: 80 }))
+      .toMatchObject({ kind: 'capture', confidence: 'likely' });
+    expect(likelyCaptureTag({ playedMove: capture, afterFen: before.fen(), opponentResponseUci: null, lossCp: 0 })).toBeNull();
   });
 });

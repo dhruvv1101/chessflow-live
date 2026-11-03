@@ -49,6 +49,19 @@ describe('resumable report game analysis', () => {
     analyzer.dispose();
   });
 
+  it('never flags an exact engine-best move even when separate searches disagree', async () => {
+    const search = vi.fn(async (fen) => ({
+      score: { cp: fen === game.moves[0].fenBefore ? 400 : -500, mate: null },
+      bestMoveUci: fen === game.moves[0].fenBefore ? 'e2e4' : 'e7e5',
+      pvUci: [], depth: 10, nodes: 20,
+    }));
+    const analyzer = createGameAnalyzer({ search, cache: fakeCache(), depth: 10, yieldMs: 0 });
+    const [row] = await analyzer.analyzeGames([game]);
+
+    expect(row).toMatchObject({ playedUci: 'e2e4', bestMoveUci: 'e2e4', classification: 'Good', evaluationLossCp: 0, winProbabilityLoss: 0, lostAdvantage: false });
+    analyzer.dispose();
+  });
+
   it('analyzes every ply without a cap and records move-number notation and best SAN', async () => {
     const chess = new Chess();
     const moves = [];
@@ -71,7 +84,8 @@ describe('resumable report game analysis', () => {
     expect(rows).toHaveLength(80);
     expect(rows.slice(0, 4).map((row) => row.notation)).toEqual(['1. Nf3', '1... Nf6', '2. Ng1', '2... Ng8']);
     expect(rows.every((row) => row.bestMoveSan)).toBe(true);
-    expect(rows.slice(0, 4).map((row) => row.userColor)).toEqual(['white', 'black', 'white', 'black']);
+    expect(rows.slice(0, 4).map((row) => row.moverColor)).toEqual(['white', 'black', 'white', 'black']);
+    expect(rows.every((row) => row.userColor === 'white')).toBe(true);
     expect(cache.putGame).toHaveBeenCalledWith(fullGame.url, 10, rows);
     analyzer.dispose();
   });
@@ -86,6 +100,41 @@ describe('resumable report game analysis', () => {
     const rows = await analyzer.analyzeGames([game]);
     expect(rows[0].classification).toBe('Good');
     expect(await cache.getGame(game.url, 10)).toEqual(rows);
+    analyzer.dispose();
+  });
+
+  it('marks a missed chance when the opponent blunders and the user misses the best reply', async () => {
+    const chess = new Chess();
+    const moves = [];
+    for (const san of ['e4', 'e5', 'Nf3']) {
+      const fenBefore = chess.fen();
+      const move = chess.move(san);
+      moves.push({ ply: moves.length + 1, color: move.color, san: move.san, uci: `${move.from}${move.to}`, fenBefore, fenAfter: move.after });
+    }
+    const gameWithMissedChance = { ...game, moves };
+    const whiteScores = new Map([
+      [moves[0].fenBefore, 0],
+      [moves[0].fenAfter, 0],
+      [moves[1].fenAfter, 250],
+      [moves[2].fenAfter, 180],
+    ]);
+    const bestMoves = new Map([
+      [moves[0].fenBefore, 'e2e4'],
+      [moves[0].fenAfter, 'd7d5'],
+      [moves[1].fenAfter, 'd2d4'],
+      [moves[2].fenAfter, 'b8c6'],
+    ]);
+    const search = vi.fn(async (fen) => ({
+      score: { cp: (fen.split(/\s+/)[1] === 'b' ? -1 : 1) * whiteScores.get(fen), mate: null },
+      bestMoveUci: bestMoves.get(fen), pvUci: [], depth: 10, nodes: 10,
+    }));
+    const analyzer = createGameAnalyzer({ search, cache: fakeCache(), depth: 10, yieldMs: 0 });
+
+    const rows = await analyzer.analyzeGames([gameWithMissedChance]);
+
+    expect(rows[1]).toMatchObject({ isUserMove: false, classification: 'Blunder' });
+    expect(rows[2]).toMatchObject({ isUserMove: true, playedSan: 'Nf3', bestMoveSan: 'd4', missedChance: { confidence: 'likely', opponentMoveNotation: '1... e5', opponentMoveClassification: 'Blunder' } });
+    expect(rows[2].evaluationBefore.userScore.cp).toBe(250);
     analyzer.dispose();
   });
 

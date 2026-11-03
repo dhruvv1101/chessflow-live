@@ -53,18 +53,32 @@ export function parseClockSeconds(clock) {
   return Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(`0.${match[4] || 0}`);
 }
 
-export function timeContext({ spentSeconds, remainingSeconds, averageSpentSeconds } = {}, thresholds = FREE_LIMITS.timeContext) {
+export function timeContext({ spentSeconds, remainingSeconds, averageSpentSeconds, baseTimeSeconds, timeClass } = {}, thresholds = FREE_LIMITS.timeContext) {
   if (!Number.isFinite(remainingSeconds) || remainingSeconds < 0) return { label: 'unknown', confidence: null };
-  if (remainingSeconds <= thresholds.lowClockSeconds) return { label: 'low clock', confidence: 'likely' };
   if (!Number.isFinite(spentSeconds) || spentSeconds < 0) return { label: 'unknown', confidence: null };
-  if (spentSeconds <= thresholds.instantMoveMaxSeconds) return { label: 'instant move', confidence: 'likely' };
+  const normalizedClass = String(timeClass || '').toLowerCase();
+  const inferredClass = normalizedClass === 'bullet' || normalizedClass === 'blitz' || normalizedClass === 'rapid'
+    ? normalizedClass
+    : Number.isFinite(baseTimeSeconds) ? (baseTimeSeconds <= 180 ? 'bullet' : baseTimeSeconds <= 600 ? 'blitz' : 'rapid') : 'default';
+  const classThresholds = thresholds.byClass[inferredClass] || thresholds.byClass.default;
+  const instantLimit = Number.isFinite(baseTimeSeconds)
+    ? Math.min(classThresholds.instantMoveMaxSeconds, baseTimeSeconds * thresholds.instantMoveBaseRatio)
+    : classThresholds.instantMoveMaxSeconds;
+  const lowClockLimit = Number.isFinite(baseTimeSeconds) && classThresholds.lowClockRatio != null
+    ? Math.max(classThresholds.lowClockMinSeconds, Math.min(classThresholds.lowClockMaxSeconds, baseTimeSeconds * classThresholds.lowClockRatio))
+    : classThresholds.lowClockSeconds;
+  const longThinkLimit = Number.isFinite(baseTimeSeconds) && classThresholds.longThinkBaseRatio != null
+    ? Math.max(classThresholds.longThinkMinSeconds, baseTimeSeconds * classThresholds.longThinkBaseRatio)
+    : classThresholds.longThinkMinSeconds;
+  if (remainingSeconds <= lowClockLimit) return { label: 'low clock', confidence: 'likely' };
+  if (spentSeconds <= instantLimit) return { label: 'instant move', confidence: 'likely' };
   const longRelativeToClock = spentSeconds >= remainingSeconds * thresholds.longThinkClockRatio;
   const longRelativeToAverage = Number.isFinite(averageSpentSeconds) && averageSpentSeconds > 0
     && spentSeconds >= averageSpentSeconds * thresholds.longThinkAverageMultiplier;
-  if (spentSeconds >= thresholds.longThinkMinSeconds || longRelativeToClock || longRelativeToAverage) {
+  if (spentSeconds >= longThinkLimit || longRelativeToClock || longRelativeToAverage) {
     return { label: 'long think', confidence: 'likely' };
   }
-  return { label: 'unknown', confidence: null };
+  return { label: 'normal pace', confidence: 'likely' };
 }
 
 export function hasLostAdvantage(beforeScore, afterScore, thresholds = FREE_LIMITS.lostAdvantage) {
@@ -72,6 +86,39 @@ export function hasLostAdvantage(beforeScore, afterScore, thresholds = FREE_LIMI
   if (beforeScore?.cp == null || beforeScore.cp < thresholds.minimumBeforeCp) return false;
   if (afterScore?.mate < 0) return true;
   return afterScore?.cp != null && beforeScore.cp - afterScore.cp >= thresholds.minimumDropCp;
+}
+
+function winProbabilityFromPlayerScore(score) {
+  if (score?.mate != null) return score.mate > 0 ? 1 : 0;
+  return 1 / (1 + (10 ** (-(score?.cp || 0) / 400)));
+}
+
+export function compareMoveLoss({ playedUci, bestMoveUci, beforeWhiteScore, afterWhiteScore, moverColor, marginCp = FREE_LIMITS.bestMoveMarginCp }) {
+  const before = playerScore(beforeWhiteScore, moverColor);
+  const after = playerScore(afterWhiteScore, moverColor);
+  const exactBestMove = Boolean(bestMoveUci && String(playedUci).toLowerCase() === String(bestMoveUci).toLowerCase());
+  const rawCpDrop = before.cp == null || after.cp == null || before.mate != null || after.mate != null
+    ? null : Math.max(0, before.cp - after.cp);
+  const bestOrWithinMargin = exactBestMove || (rawCpDrop != null && rawCpDrop <= marginCp);
+  if (bestOrWithinMargin) return { lossCp: 0, winProbabilityLoss: 0, bestOrWithinMargin, effectiveAfterScore: before };
+
+  if (rawCpDrop != null) {
+    const lossCp = Math.max(0, rawCpDrop - marginCp);
+    const effectiveAfterScore = { cp: before.cp - lossCp, mate: null };
+    return {
+      lossCp,
+      winProbabilityLoss: Math.max(0, winProbabilityFromPlayerScore(before) - winProbabilityFromPlayerScore(effectiveAfterScore)),
+      bestOrWithinMargin: false,
+      effectiveAfterScore,
+    };
+  }
+
+  return {
+    lossCp: null,
+    winProbabilityLoss: Math.max(0, winProbabilityFromPlayerScore(before) - winProbabilityFromPlayerScore(after)),
+    bestOrWithinMargin: false,
+    effectiveAfterScore: after,
+  };
 }
 
 function chessMoveFromUci(fen, uci) {
@@ -88,4 +135,12 @@ export function likelyTactic({ beforeFen, afterFen, bestMoveUci, opponentRespons
   if (response?.isCapture()) return { kind: 'hung_piece', confidence: 'likely', basis: 'engine_reply_capture' };
   if (/[+#]$/.test(response?.san || '')) return { kind: 'missed_opponent_threat', confidence: 'likely', basis: 'engine_reply_check' };
   return { kind: 'missed_opponent_threat', confidence: 'likely', basis: 'engine_evaluation_drop' };
+}
+
+export function likelyCaptureTag({ playedMove, afterFen, opponentResponseUci, lossCp }) {
+  if (!Number.isFinite(lossCp) || lossCp <= 0) return null;
+  if (playedMove?.isCapture?.()) return { kind: 'capture', confidence: 'likely', basis: 'capture-with-engine-loss' };
+  const response = chessMoveFromUci(afterFen, opponentResponseUci);
+  if (response?.isCapture()) return { kind: 'capture', confidence: 'likely', basis: 'opponent-capture-response' };
+  return null;
 }

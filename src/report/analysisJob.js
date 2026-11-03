@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic, hasLostAdvantage } from './analysis.js';
+import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic, likelyCaptureTag, hasLostAdvantage, compareMoveLoss } from './analysis.js';
 import { reportAnalysisCache } from './analysisCache.js';
 import { subscribeLiveGameActive } from './analysisCoordinator.js';
 import { createStockfishSearch } from './stockfishSearch.js';
@@ -159,38 +159,65 @@ export function createGameAnalyzer({
         const before = await positionEvaluation(move.fenBefore);
         await awaitRunnable();
         const after = await positionEvaluation(move.fenAfter);
-        const userColor = color === 'w' ? 'white' : 'black';
+        const moverColor = color === 'w' ? 'white' : 'black';
+        const userColor = game.userColor === 'black' ? 'black' : 'white';
+        const isUserMove = game.userColor === moverColor;
         const beforeEvaluation = { ...before, userScore: playerScore(before.whiteScore, userColor), winProbability: winProbability(before.whiteScore, userColor) };
         const afterEvaluation = { ...after, userScore: playerScore(after.whiteScore, userColor), winProbability: winProbability(after.whiteScore, userColor) };
-        const winProbabilityLoss = Math.max(0, beforeEvaluation.winProbability - afterEvaluation.winProbability);
-        const classification = classifyMoveLoss(winProbabilityLoss, lossThresholds);
-        const moveTimeContext = timeContext({ spentSeconds: move.timeSpentSeconds, remainingSeconds: move.clockRemainingSeconds, averageSpentSeconds });
+        const moveLoss = compareMoveLoss({
+          playedUci: move.uci, bestMoveUci: before.bestMoveUci,
+          beforeWhiteScore: before.whiteScore, afterWhiteScore: after.whiteScore,
+          moverColor,
+        });
+        const classification = classifyMoveLoss(moveLoss.winProbabilityLoss, lossThresholds);
+        const moverBeforeScore = playerScore(before.whiteScore, moverColor);
+        const moveTimeContext = timeContext({
+          spentSeconds: move.timeSpentSeconds, remainingSeconds: move.clockRemainingSeconds,
+          averageSpentSeconds, baseTimeSeconds: game.baseTimeSeconds, timeClass: game.timeClass,
+        });
         const fullmove = Number(move.fenBefore.split(/\s+/)[5]) || Math.ceil(move.ply / 2);
+        const isFlagged = ['Inaccuracy', 'Mistake', 'Blunder'].includes(classification);
+        const captureTag = isFlagged ? likelyCaptureTag({ playedMove: applied, afterFen: move.fenAfter, opponentResponseUci: after.bestMoveUci, lossCp: moveLoss.lossCp }) : null;
         rows.push({
           gameKey: game.url, ply: move.ply,
           fullmove,
           notation: `${fullmove}${color === 'b' ? '...' : '.'} ${applied.san}`,
-          userColor, isUserMove: game.userColor === userColor,
+          userColor, moverColor, isUserMove,
           playedSan: applied.san, playedUci: move.uci,
           bestMoveUci: before.bestMoveUci, bestMoveSan: before.bestMoveSan,
           opponentResponseUci: after.bestMoveUci, opponentResponseSan: after.bestMoveSan,
           principalVariationUci: before.pvUci, principalVariationSan: before.pvSan,
           evaluationBefore: beforeEvaluation, evaluationAfter: afterEvaluation,
-          evaluationLossCp: beforeEvaluation.userScore.cp == null || afterEvaluation.userScore.cp == null
-            ? null : Math.max(0, beforeEvaluation.userScore.cp - afterEvaluation.userScore.cp),
-          winProbabilityLoss, classification,
-          lostAdvantage: hasLostAdvantage(beforeEvaluation.userScore, afterEvaluation.userScore, lostAdvantageThresholds),
+          evaluationLossCp: moveLoss.lossCp,
+          winProbabilityLoss: moveLoss.winProbabilityLoss, classification,
+          lostAdvantage: hasLostAdvantage(moverBeforeScore, moveLoss.effectiveAfterScore, lostAdvantageThresholds),
           phase: gamePhase(move.fenBefore, move.ply),
           timeSpentSeconds: Number.isFinite(move.timeSpentSeconds) ? move.timeSpentSeconds : null,
           clockRemainingSeconds: Number.isFinite(move.clockRemainingSeconds) ? move.clockRemainingSeconds : null,
           timeContext: moveTimeContext.label,
           timeContextConfidence: moveTimeContext.confidence,
-          tactic: ['Inaccuracy', 'Mistake', 'Blunder'].includes(classification)
-            ? likelyTactic({ beforeFen: move.fenBefore, afterFen: move.fenAfter, bestMoveUci: before.bestMoveUci, opponentResponseUci: after.bestMoveUci, beforePlayerScore: beforeEvaluation.userScore }) : null,
+          tactic: isFlagged
+            ? likelyTactic({ beforeFen: move.fenBefore, afterFen: move.fenAfter, bestMoveUci: before.bestMoveUci, opponentResponseUci: after.bestMoveUci, beforePlayerScore: moverBeforeScore }) : null,
+          tacticTags: captureTag ? [captureTag] : [],
           depth: Math.min(before.depth, after.depth), nodes: before.nodes + after.nodes,
         });
         onProgress({ completed: index + 1, total: work.length, gameIndex: games.indexOf(game) + 1, ply: move.ply });
         if (yieldMs > 0) await new Promise((resolve) => setTimeout(resolve, yieldMs));
+      }
+      for (let index = 1; index < rows.length; index += 1) {
+        const previous = rows[index - 1];
+        const current = rows[index];
+        const opponentMadeMistake = ['Mistake', 'Blunder'].includes(previous.classification);
+        if (current.isUserMove && current.gameKey === previous.gameKey && current.ply === previous.ply + 1
+          && !previous.isUserMove && opponentMadeMistake && current.evaluationLossCp > 0) {
+          current.missedChance = {
+            confidence: 'likely',
+            opponentMoveNotation: previous.notation,
+            opponentMoveClassification: previous.classification,
+            bestReplySan: current.bestMoveSan,
+            playedSan: current.playedSan,
+          };
+        }
       }
       if (cache.putGame) {
         for (const game of games) {

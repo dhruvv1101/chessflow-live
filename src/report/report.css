@@ -14,6 +14,8 @@
 .report-progress h2 { margin: 0 0 8px; font-size: 16px; font-weight: 950; }
 .report-analysis-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .report-analysis-filters .button { min-height: 34px; padding: 6px 9px; font-size: 10px; }
+.report-opponent-toggle { display: inline-flex; align-items: center; gap: 8px; margin: 4px 0 8px; font-size: 12px; font-weight: 800; }
+.report-opponent-toggle input { accent-color: var(--purple); }
 .report-analysis-table-wrap { max-width: 100%; overflow-x: auto; }
 .report-analysis-table { width: 100%; border-collapse: collapse; font-size: 11px; text-align: left; }
 .report-analysis-table th, .report-analysis-table td { padding: 7px 8px; border-bottom: var(--line); white-space: nowrap; }

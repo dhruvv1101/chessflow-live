@@ -23,6 +23,7 @@ describe('report Chess.com import', () => {
     const timedPgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "*"]\n[TimeControl "600+5"]\n\n1. e4 {[%clk 0:09:59.2]} e5 {[%clk 0:09:58.1]} 2. Nf3 {[%clk 0:09:52.2]} *`;
     const parsed = parseReportPgn({ url: 'https://chess.com/game/timed', pgn: timedPgn, rules: 'chess', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } }, 'TestPlayer');
     expect(parsed.moves.map((move) => move.clockRemainingSeconds)).toEqual([599.2, 598.1, 592.2]);
+    expect(parsed.baseTimeSeconds).toBe(600);
     expect(parsed.moves[0].timeSpentSeconds).toBeCloseTo(5.8);
     expect(parsed.moves[1].timeSpentSeconds).toBeCloseTo(6.9);
     expect(parsed.moves[2].timeSpentSeconds).toBeCloseTo(12);

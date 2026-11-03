@@ -78,6 +78,7 @@ export function parseReportPgn(game, username) {
     userColor: userColorFrom(game, player, headers),
     result: headersResult || '*',
     timeClass: String(game.time_class || headers.TimeControl || 'unknown'),
+    baseTimeSeconds: clockSettings?.initialSeconds ?? null,
     eco: String(headers.ECO || game.eco || ''),
     opening: String(headers.Opening || game.opening || ''),
     endTime: Number.isFinite(endTime) ? endTime * 1000 : 0,
