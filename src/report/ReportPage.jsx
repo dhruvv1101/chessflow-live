@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './report.css';
+import './report-workspace.css';
 import { reportChessComClient } from './client.js';
 import { useEntitlement } from './useEntitlement.js';
 import { clearReportGames, loadReportGames, saveReportGames } from './storage.js';
 import { clearAnalysisCache } from './analysisCache.js';
 import AnalysisProgress from './AnalysisProgress.jsx';
 import ReportInsights from './ReportInsights.jsx';
+import ReportFilters from './ReportFilters.jsx';
+import { filterReportData } from './filters.js';
 import { loadOpeningDatabase } from '../openings.js';
 import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 import { detectLeaks } from './leaks.js';
@@ -30,22 +33,27 @@ export default function ReportPage() {
   const [username, setUsername] = useState('');
   const [games, setGames] = useState([]);
   const [analysisRows, setAnalysisRows] = useState([]);
+  const [analysisStatus, setAnalysisStatus] = useState('idle');
   const [openingDatabase, setOpeningDatabase] = useState(null);
   const [openingStatus, setOpeningStatus] = useState('idle');
+  const [filters, setFilters] = useState({ side: 'all', timeClass: 'all', from: '', to: '' });
+  const [importStatusOpen, setImportStatusOpen] = useState(true);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState('');
+  const [storageError, setStorageError] = useState('');
   const [message, setMessage] = useState('');
   const [importReasons, setImportReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const controllerRef = useRef(null);
 
-  const handleAnalysisComplete = useCallback((rows) => setAnalysisRows(rows), []);
+  const handleAnalysisComplete = useCallback((rows) => { setAnalysisRows(rows); setImportStatusOpen(false); }, []);
+  const handleAnalysisStatus = useCallback((state) => setAnalysisStatus(state.status), []);
 
   useEffect(() => {
     let active = true;
     loadReportGames().then((stored) => { if (active) setGames(stored); })
-      .catch(() => { if (active) setError('Could not open local game-report storage in this browser.'); })
+      .catch(() => { if (active) { setError('Could not open local game-report storage in this browser.'); setStorageError('Could not open local game-report storage in this browser.'); } })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; controllerRef.current?.abort(); };
   }, []);
@@ -60,18 +68,21 @@ export default function ReportPage() {
     return () => { active = false; };
   }, [analysisRows, games]);
 
+  const filtered = useMemo(() => filterReportData(games, analysisRows, filters), [games, analysisRows, filters]);
+
   const insights = useMemo(() => {
-    if (!analysisRows.length || !openingDatabase) return null;
-    const contextualRows = attachOpeningContexts(games, analysisRows, openingDatabase);
-    const tree = buildOpeningTree(games, contextualRows, { database: openingDatabase, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves });
+    if (!filtered.rows.length) return null;
+    const database = openingDatabase || {};
+    const contextualRows = attachOpeningContexts(filtered.games, filtered.rows, database);
+    const tree = buildOpeningTree(filtered.games, contextualRows, { database, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves });
     return {
       tree,
       openingRows: buildOpeningSummary(tree),
-      leaks: detectLeaks(games, contextualRows, { tree, topN: limits.topLeaks, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
-      firstMistakes: summarizeFirstBigMistakes(games, contextualRows, { ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
+      leaks: detectLeaks(filtered.games, contextualRows, { tree, topN: limits.topLeaks, ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
+      firstMistakes: summarizeFirstBigMistakes(filtered.games, contextualRows, { ...limits.reportInsights, minimumUserMoves: limits.minimumUserMoves }),
       analysisRows: contextualRows,
     };
-  }, [analysisRows, games, limits, openingDatabase]);
+  }, [filtered, limits, openingDatabase]);
 
   const importGames = async (event) => {
     event.preventDefault();
@@ -120,7 +131,9 @@ export default function ReportPage() {
       <div className="hero-foot"><p>Import your public games for a private, on-device report and training plan.</p><p className="hero-status">Free tier: up to {limits.maxGames} most recent standard games.</p></div>
     </section>
 
-    <section className="folder-card report-import-card" aria-labelledby="report-import-title">
+    <details className="folder-card report-import-card" open={importStatusOpen} onToggle={(event) => setImportStatusOpen(event.currentTarget.open)}>
+      <summary className="report-import-summary"><span>Import and analysis status</span><span className="report-import-state">{loading ? 'Loading saved games' : busy ? 'Import in progress' : error ? 'Needs attention' : analysisRows.length ? 'Analysis complete' : games.length ? 'Analysis in progress' : 'Ready'}</span></summary>
+      <div className="report-import-content">
       <div className="folder-tab tab-purple" aria-hidden="true"/>
       <div className="folder-head"><div className="icon-box icon-purple" aria-hidden="true">↧</div><div><p className="meta-line">PUBLIC CHESS.COM GAMES</p><h2 id="report-import-title">Import games</h2></div></div>
       <p className="small-meta report-description">Enter a Chess.com username. It is sent to Chess.com through this site's server function. No password or Chess.com login is used.</p>
@@ -133,28 +146,33 @@ export default function ReportPage() {
       </form>
       <p id="report-limits" className="small-meta">Only standard chess games, the {limits.maxGames} most recent, are kept.</p>
       {progress && <div className="report-progress" role="status" aria-live="polite"><p>{progress.message}</p><progress aria-label="Import progress" max={Math.max(1, progress.total)} value={progress.completed}/></div>}
-      <AnalysisProgress games={games} onAnalysisComplete={handleAnalysisComplete}/>
+      <AnalysisProgress games={games} onAnalysisComplete={handleAnalysisComplete} onStatusChange={handleAnalysisStatus}/>
       {error && <p className="report-message report-error" role="alert">{error}</p>}
       {message && <p className="report-message" role="status" aria-live="polite">{message}</p>}
       {importReasons.length > 0 && <details className="report-message">
         <summary>Why some games were skipped ({importReasons.length} details)</summary>
         <ul>{importReasons.map((entry, index) => <li key={`${entry.url}-${index}`}>{entry.url || `Game ${index + 1}`}: {entry.reason}</li>)}</ul>
       </details>}
-    </section>
+      </div>
+    </details>
 
-    {openingStatus === 'loading' && analysisRows.length > 0 && <p className="folder-card report-insight-empty" role="status">Loading the bundled opening names…</p>}
-    {openingStatus === 'error' && analysisRows.length > 0 && <p className="folder-card report-insight-empty" role="alert">Opening names could not be loaded; local move analysis is still available.</p>}
-    {insights && <ReportInsights leaks={insights.leaks} openingRows={insights.openingRows} firstMistakes={insights.firstMistakes}/>}
+    <ReportFilters games={games} shownCount={filtered.games.length} value={filters} onChange={setFilters} loading={loading} error={storageError}/>
+    <ReportInsights
+      leaks={insights?.leaks || []} openingRows={insights?.openingRows || []}
+      firstMistakes={insights?.firstMistakes || { gamesLost: 0, gamesWithFirstMistake: 0, entries: [] }}
+      openingStatus={!filtered.games.length ? 'empty' : openingStatus === 'error' ? 'error' : openingStatus === 'ready' ? 'ready' : 'loading'}
+      leaksStatus={!filtered.games.length ? 'empty' : analysisStatus === 'error' ? 'error' : !filtered.rows.length ? 'loading' : 'ready'}
+    />
 
     <section className="report-games-section" aria-labelledby="report-games-title">
       <div className="section-heading"><div><p className="meta-line">SAVED ON THIS DEVICE</p><h2 id="report-games-title">Imported games</h2></div><button className="button button-outline" type="button" onClick={deleteImportedData} disabled={busy || !games.length}>Delete my imported data</button></div>
-      {loading ? <p className="folder-card report-empty" role="status">Loading local games…</p> : games.length ? <div className="report-game-list">
-        {games.map((game) => <article className="folder-card report-game-card" key={game.url}>
+      {loading ? <p className="folder-card report-empty" role="status">Loading local games…</p> : storageError ? <p className="folder-card report-empty" role="alert">{storageError}</p> : filtered.games.length ? <>{analysisStatus === 'running' && <p className="folder-card report-empty" role="status">Game list is ready while move analysis continues.</p>}<div className="report-game-list">
+        {filtered.games.map((game) => <article className="folder-card report-game-card" key={game.url}>
           <p className="meta-line">{formatDate(game.endTime)} · {game.timeClass}</p>
           <h3>{game.headers.White || 'White'} vs {game.headers.Black || 'Black'}</h3>
           <p className="small-meta">You played {game.userColor || 'unknown side'} · {game.result}{game.eco ? ` · ${game.eco}${game.opening ? ` ${game.opening}` : ''}` : ''} · {game.moves.length} plies</p>
         </article>)}
-      </div> : <div className="folder-card report-empty"><p className="meta-line">NO IMPORTED GAMES</p><h3>Your report starts here</h3><p className="small-meta">Import recent public games above. Games are saved in this browser; the proxy does not retain game records.</p></div>}
+      </div></> : games.length ? <p className="folder-card report-empty" role="status">No games match the current filters.</p> : <div className="folder-card report-empty"><p className="meta-line">NO IMPORTED GAMES</p><h3>Your report starts here</h3><p className="small-meta">Import recent public games above. Games are saved in this browser; the proxy does not retain game records.</p></div>}
     </section>
 
     <footer className="site-footer report-footer"><span><img className="footer-mark" src="/assets/chessflow-logo.png" alt=""/> ChessFlow Live</span><span>Not affiliated with Chess.com.</span></footer>

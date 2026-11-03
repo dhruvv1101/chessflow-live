@@ -66,7 +66,7 @@ function LeakCard({ leak }) {
   </article>;
 }
 
-export default function ReportInsights({ leaks, openingRows, firstMistakes }) {
+export default function ReportInsights({ leaks, openingRows, firstMistakes, openingStatus = 'ready', leaksStatus = 'ready' }) {
   const openingTable = (color, title) => {
     const items = openingRows.filter((opening) => opening.color === color);
     return <section className="report-insight-section" aria-label={`${title} opening performance`}>
@@ -81,20 +81,30 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes }) {
     </section>;
   };
   return <section className="report-insights" aria-labelledby="report-insights-title">
-    <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Opening tree &amp; recurring leaks</h2></div></div>
-    <section className="report-insight-section" aria-labelledby="report-leaks-title">
-      <h3 id="report-leaks-title">Top leaks</h3>
-      {leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak}/>)}</div>
-        : <p className="folder-card report-insight-empty">No recurring leaks yet. Patterns need at least two games.</p>}
-    </section>
+    <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div></div>
     <section className="report-insight-section" aria-labelledby="report-opening-table-title">
-      <h3 id="report-opening-table-title">Opening performance</h3>
-      {openingTable('white', 'White')}
-      {openingTable('black', 'Black')}
+      <h3 id="report-opening-table-title">Opening tree</h3>
+      {openingStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Opening tree is being prepared…</p>
+        : openingStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Opening names are unavailable. Your imported games remain saved.</p>
+          : openingStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p> : <>
+            {openingTable('white', 'White')}
+            {openingTable('black', 'Black')}
+          </>}
+    </section>
+    <section className="report-insight-section" aria-labelledby="report-leaks-title">
+      <h3 id="report-leaks-title">Leaks</h3>
+      {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Stockfish analysis is in progress…</p>
+        : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Stockfish analysis failed. Your imported games are still saved; retry by refreshing this report.</p>
+        : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
+          : leaks.length ? <div className="report-insight-grid">{leaks.map((leak) => <LeakCard key={leak.id} leak={leak}/>)}</div>
+            : <p className="folder-card report-insight-empty">No recurring leaks yet. Patterns need at least two games.</p>}
     </section>
     <section className="report-insight-section" aria-labelledby="report-first-mistake-title">
       <h3 id="report-first-mistake-title">First big mistake in lost games</h3>
-      {!firstMistakes.gamesLost ? <p className="folder-card report-insight-empty">No completed lost games in this report.</p> : <article className="folder-card report-first-mistake-card">
+      {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Waiting for move analysis…</p>
+        : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">First-mistake summary is unavailable until analysis completes.</p>
+          : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
+            : !firstMistakes.gamesLost ? <p className="folder-card report-insight-empty">No completed lost games in this report.</p> : <article className="folder-card report-first-mistake-card">
         <p>{firstMistakes.gamesWithFirstMistake} of {firstMistakes.gamesLost} lost games had a qualifying first mistake.</p>
         {firstMistakes.averagePly != null && <p className="small-meta">Average ply {firstMistakes.averagePly.toFixed(1)} · most common phase: {firstMistakes.mostCommonPhase || 'unknown'} · most common tag: {firstMistakes.mostCommonTag || 'none recorded'}.</p>}
         <ul>{firstMistakes.entries.map((entry) => <li key={entry.gameId}>{entry.move} · {entry.phase} · {entry.timeSpentSeconds == null ? 'time unknown' : `${entry.timeSpentSeconds.toFixed(1)}s`} · {entry.tag || 'no tactic tag'}</li>)}</ul>

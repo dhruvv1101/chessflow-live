@@ -13,12 +13,14 @@ function formatElapsed(milliseconds = 0) {
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }
 
-export default function AnalysisProgress({ games, onAnalysisComplete }) {
+export default function AnalysisProgress({ games, onAnalysisComplete, onStatusChange }) {
   const sessionRef = useRef(null);
   const gamesRef = useRef(games);
   const activeRef = useRef(true);
   const [state, setState] = useState({ status: 'idle', completed: 0, total: 0, rows: 0, results: [], error: '' });
   const [liveGameActive, setLiveGameActive] = useState(false);
+
+  useEffect(() => { onStatusChange?.(state); }, [onStatusChange, state]);
 
   gamesRef.current = games;
 
