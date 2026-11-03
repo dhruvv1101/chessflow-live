@@ -1,6 +1,6 @@
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic } from './analysis.js';
+import { normalizeAnalysisFen, playerScore, winProbability, classifyMoveLoss, gamePhase, timeContext, likelyTactic, hasLostAdvantage } from './analysis.js';
 import { reportAnalysisCache } from './analysisCache.js';
 import { subscribeLiveGameActive } from './analysisCoordinator.js';
 import { createStockfishSearch } from './stockfishSearch.js';
@@ -54,6 +54,7 @@ export function createGameAnalyzer({
   cache = reportAnalysisCache,
   depth = FREE_LIMITS.analysisDepth,
   lossThresholds = FREE_LIMITS.lossThresholds,
+  lostAdvantageThresholds = FREE_LIMITS.lostAdvantage,
   yieldMs = 12,
 } = {}) {
   const runSearch = search || createStockfishSearch();
@@ -137,15 +138,23 @@ export function createGameAnalyzer({
     signal?.addEventListener('abort', cancelFromCaller, { once: true });
     const work = [];
     for (const game of games) {
-      const color = game.userColor === 'white' ? 'w' : game.userColor === 'black' ? 'b' : null;
-      if (color) for (const move of game.moves || []) if (move.color === color) work.push({ game, move, color });
+      const moves = game.moves || [];
+      const averages = new Map();
+      for (const move of moves) {
+        if (!Number.isFinite(move.timeSpentSeconds)) continue;
+        const samples = averages.get(move.color) || [];
+        samples.push(move.timeSpentSeconds);
+        averages.set(move.color, samples);
+      }
+      const averageTimes = new Map([...averages].map(([color, values]) => [color, values.reduce((sum, value) => sum + value, 0) / values.length]));
+      for (const move of moves) if (move.color === 'w' || move.color === 'b') work.push({ game, move, color: move.color, averageSpentSeconds: averageTimes.get(move.color) });
     }
     const rows = [];
     try {
       onProgress({ completed: 0, total: work.length, gameIndex: 0, ply: 0 });
       for (let index = 0; index < work.length; index += 1) {
         await awaitRunnable();
-        const { game, move, color } = work[index];
+        const { game, move, color, averageSpentSeconds } = work[index];
         const applied = validateMove(move, color);
         const before = await positionEvaluation(move.fenBefore);
         await awaitRunnable();
@@ -155,8 +164,13 @@ export function createGameAnalyzer({
         const afterEvaluation = { ...after, userScore: playerScore(after.whiteScore, userColor), winProbability: winProbability(after.whiteScore, userColor) };
         const winProbabilityLoss = Math.max(0, beforeEvaluation.winProbability - afterEvaluation.winProbability);
         const classification = classifyMoveLoss(winProbabilityLoss, lossThresholds);
+        const moveTimeContext = timeContext({ spentSeconds: move.timeSpentSeconds, remainingSeconds: move.clockRemainingSeconds, averageSpentSeconds });
+        const fullmove = Number(move.fenBefore.split(/\s+/)[5]) || Math.ceil(move.ply / 2);
         rows.push({
-          gameKey: game.url, ply: move.ply, fullmove: Math.ceil(move.ply / 2), userColor,
+          gameKey: game.url, ply: move.ply,
+          fullmove,
+          notation: `${fullmove}${color === 'b' ? '...' : '.'} ${applied.san}`,
+          userColor, isUserMove: game.userColor === userColor,
           playedSan: applied.san, playedUci: move.uci,
           bestMoveUci: before.bestMoveUci, bestMoveSan: before.bestMoveSan,
           opponentResponseUci: after.bestMoveUci, opponentResponseSan: after.bestMoveSan,
@@ -165,13 +179,24 @@ export function createGameAnalyzer({
           evaluationLossCp: beforeEvaluation.userScore.cp == null || afterEvaluation.userScore.cp == null
             ? null : Math.max(0, beforeEvaluation.userScore.cp - afterEvaluation.userScore.cp),
           winProbabilityLoss, classification,
-          phase: gamePhase(move.fenBefore, move.ply), timeContext: timeContext(move.clock),
+          lostAdvantage: hasLostAdvantage(beforeEvaluation.userScore, afterEvaluation.userScore, lostAdvantageThresholds),
+          phase: gamePhase(move.fenBefore, move.ply),
+          timeSpentSeconds: Number.isFinite(move.timeSpentSeconds) ? move.timeSpentSeconds : null,
+          clockRemainingSeconds: Number.isFinite(move.clockRemainingSeconds) ? move.clockRemainingSeconds : null,
+          timeContext: moveTimeContext.label,
+          timeContextConfidence: moveTimeContext.confidence,
           tactic: ['Inaccuracy', 'Mistake', 'Blunder'].includes(classification)
             ? likelyTactic({ beforeFen: move.fenBefore, afterFen: move.fenAfter, bestMoveUci: before.bestMoveUci, opponentResponseUci: after.bestMoveUci, beforePlayerScore: beforeEvaluation.userScore }) : null,
           depth: Math.min(before.depth, after.depth), nodes: before.nodes + after.nodes,
         });
         onProgress({ completed: index + 1, total: work.length, gameIndex: games.indexOf(game) + 1, ply: move.ply });
         if (yieldMs > 0) await new Promise((resolve) => setTimeout(resolve, yieldMs));
+      }
+      if (cache.putGame) {
+        for (const game of games) {
+          try { await cache.putGame(game.url, depth, rows.filter((row) => row.gameKey === game.url)); }
+          catch { /* Results remain available in memory if local persistence is unavailable. */ }
+        }
       }
       return rows;
     } finally {

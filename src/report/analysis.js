@@ -28,24 +28,50 @@ export function classifyMoveLoss(loss, thresholds = FREE_LIMITS.lossThresholds) 
   return 'Inaccuracy';
 }
 
-export function gamePhase(fen, ply) {
+export function gamePhase(fen, ply, thresholds = FREE_LIMITS.phaseThresholds) {
   const chess = new Chess(fen);
   const pieces = chess.board().flat().filter((piece) => piece && piece.type !== 'k');
   const material = pieces.reduce((sum, piece) => sum + ({ q: 9, r: 5, b: 3, n: 3, p: 1 }[piece.type] || 0), 0);
   const queens = pieces.filter((piece) => piece.type === 'q').length;
-  if (material <= 13 || queens === 0) return 'endgame';
-  if (ply <= 20) return 'opening';
+  const fullmove = Number(fen.split(/\s+/)[5]) || Math.ceil(ply / 2);
+
+  // Material distinguishes a genuinely reduced ending from an early queen
+  // trade: no queens alone is not enough to call a position an endgame.
+  if (queens === 0 && material <= thresholds.endgameMaterialNoQueens) return 'endgame';
+  if (material <= thresholds.endgameMaterialAnyQueen) return 'endgame';
+
+  // Call it an opening only while the position remains materially close to
+  // the starting army; move number by itself never determines the phase.
+  if (fullmove <= thresholds.openingMaxFullmove && material >= thresholds.openingMinMaterial) return 'opening';
   return 'middlegame';
 }
 
-export function timeContext(clock) {
-  if (clock == null || clock === '') return 'unknown';
+export function parseClockSeconds(clock) {
+  if (clock == null || clock === '') return null;
   const match = String(clock).trim().match(/^(?:(\d+):)?(\d{1,2}):(\d{2})(?:\.(\d+))?$/);
-  if (!match) return 'unknown';
-  const seconds = Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(`0.${match[4] || 0}`);
-  if (seconds <= 30) return 'time trouble';
-  if (seconds <= 120) return 'rushed';
-  return 'had plenty of time';
+  if (!match) return null;
+  return Number(match[1] || 0) * 3600 + Number(match[2]) * 60 + Number(match[3]) + Number(`0.${match[4] || 0}`);
+}
+
+export function timeContext({ spentSeconds, remainingSeconds, averageSpentSeconds } = {}, thresholds = FREE_LIMITS.timeContext) {
+  if (!Number.isFinite(remainingSeconds) || remainingSeconds < 0) return { label: 'unknown', confidence: null };
+  if (remainingSeconds <= thresholds.lowClockSeconds) return { label: 'low clock', confidence: 'likely' };
+  if (!Number.isFinite(spentSeconds) || spentSeconds < 0) return { label: 'unknown', confidence: null };
+  if (spentSeconds <= thresholds.instantMoveMaxSeconds) return { label: 'instant move', confidence: 'likely' };
+  const longRelativeToClock = spentSeconds >= remainingSeconds * thresholds.longThinkClockRatio;
+  const longRelativeToAverage = Number.isFinite(averageSpentSeconds) && averageSpentSeconds > 0
+    && spentSeconds >= averageSpentSeconds * thresholds.longThinkAverageMultiplier;
+  if (spentSeconds >= thresholds.longThinkMinSeconds || longRelativeToClock || longRelativeToAverage) {
+    return { label: 'long think', confidence: 'likely' };
+  }
+  return { label: 'unknown', confidence: null };
+}
+
+export function hasLostAdvantage(beforeScore, afterScore, thresholds = FREE_LIMITS.lostAdvantage) {
+  if (beforeScore?.mate > 0 && (afterScore?.mate == null || afterScore.mate <= 0)) return true;
+  if (beforeScore?.cp == null || beforeScore.cp < thresholds.minimumBeforeCp) return false;
+  if (afterScore?.mate < 0) return true;
+  return afterScore?.cp != null && beforeScore.cp - afterScore.cp >= thresholds.minimumDropCp;
 }
 
 function chessMoveFromUci(fen, uci) {

@@ -9,15 +9,18 @@ function sampleGame() {
   const played = chess.move('e4');
   return {
     url: 'https://chess.com/game/analysis-test', userColor: 'white',
-    moves: [{ ply: 1, color: 'w', san: played.san, uci: 'e2e4', fenBefore, fenAfter: chess.fen(), clock: '0:04:00' }],
+    moves: [{ ply: 1, color: 'w', san: played.san, uci: 'e2e4', fenBefore, fenAfter: chess.fen(), clock: '0:04:00', timeSpentSeconds: 45, clockRemainingSeconds: 240 }],
   };
 }
 
 function fakeCache() {
   const values = new Map();
+  const gameValues = new Map();
   return {
     get: vi.fn(async (fen, depth) => values.get(`${fen}|${depth}`) || null),
     put: vi.fn(async (fen, depth, value) => values.set(`${fen}|${depth}`, value)),
+    putGame: vi.fn(async (gameKey, depth, rows) => gameValues.set(`${gameKey}|${depth}`, rows)),
+    getGame: vi.fn(async (gameKey, depth) => gameValues.get(`${gameKey}|${depth}`) || null),
   };
 }
 
@@ -38,11 +41,51 @@ describe('resumable report game analysis', () => {
     const result = await analyzer.analyzeGames([game]);
 
     expect(result).toHaveLength(1);
-    expect(result[0]).toMatchObject({ ply: 1, playedSan: 'e4', bestMoveUci: 'd2d4', classification: 'Inaccuracy', phase: 'opening', timeContext: 'had plenty of time', tactic: { confidence: 'likely' }, depth: 10 });
+    expect(result[0]).toMatchObject({ ply: 1, notation: '1. e4', playedSan: 'e4', bestMoveUci: 'd2d4', classification: 'Inaccuracy', phase: 'opening', timeContext: 'long think', timeContextConfidence: 'likely', timeSpentSeconds: 45, clockRemainingSeconds: 240, tactic: { confidence: 'likely' }, depth: 10 });
     expect(result[0].winProbabilityLoss).toBeGreaterThan(0.05);
     expect(result[0].evaluationBefore.userScore.cp).toBe(200);
     expect(result[0].evaluationAfter.userScore.cp).toBe(100);
     expect(cache.put).toHaveBeenCalledTimes(2);
+    analyzer.dispose();
+  });
+
+  it('analyzes every ply without a cap and records move-number notation and best SAN', async () => {
+    const chess = new Chess();
+    const moves = [];
+    const sanMoves = ['Nf3', 'Nf6', 'Ng1', 'Ng8'];
+    for (const san of Array.from({ length: 20 }, () => sanMoves).flat()) {
+      const fenBefore = chess.fen();
+      const move = chess.move(san);
+      moves.push({ ply: moves.length + 1, color: move.color, san: move.san, uci: `${move.from}${move.to}`, fenBefore, fenAfter: move.after, clock: '0:04:00', timeSpentSeconds: 10, clockRemainingSeconds: 240 });
+    }
+    const fullGame = { ...game, moves };
+    const search = vi.fn(async (fen) => ({
+      score: { cp: fen === moves[0].fenBefore ? 300 : 0, mate: null },
+      bestMoveUci: `${new Chess(fen).moves({ verbose: true })[0].from}${new Chess(fen).moves({ verbose: true })[0].to}`,
+      pvUci: [`${new Chess(fen).moves({ verbose: true })[0].from}${new Chess(fen).moves({ verbose: true })[0].to}`], depth: 10, nodes: 20,
+    }));
+    const cache = fakeCache();
+    const analyzer = createGameAnalyzer({ search, cache, depth: 10, yieldMs: 0 });
+    const rows = await analyzer.analyzeGames([fullGame]);
+
+    expect(rows).toHaveLength(80);
+    expect(rows.slice(0, 4).map((row) => row.notation)).toEqual(['1. Nf3', '1... Nf6', '2. Ng1', '2... Ng8']);
+    expect(rows.every((row) => row.bestMoveSan)).toBe(true);
+    expect(rows.slice(0, 4).map((row) => row.userColor)).toEqual(['white', 'black', 'white', 'black']);
+    expect(cache.putGame).toHaveBeenCalledWith(fullGame.url, 10, rows);
+    analyzer.dispose();
+  });
+
+  it('persists all move rows, including good moves excluded from the summary', async () => {
+    const cache = fakeCache();
+    const search = vi.fn(async (fen) => ({
+      score: { cp: 0, mate: null }, bestMoveUci: `${new Chess(fen).moves({ verbose: true })[0].from}${new Chess(fen).moves({ verbose: true })[0].to}`,
+      pvUci: [], depth: 10, nodes: 1,
+    }));
+    const analyzer = createGameAnalyzer({ search, cache, depth: 10, yieldMs: 0 });
+    const rows = await analyzer.analyzeGames([game]);
+    expect(rows[0].classification).toBe('Good');
+    expect(await cache.getGame(game.url, 10)).toEqual(rows);
     analyzer.dispose();
   });
 

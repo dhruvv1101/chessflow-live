@@ -61,10 +61,10 @@ export default function AnalysisProgress({ games }) {
   };
   const isRunning = state.status === 'running';
   const message = state.status === 'error' ? state.error
-    : state.status === 'complete' ? `Analysis complete: ${state.rows} of ${state.total} user moves.`
+    : state.status === 'complete' ? `Analysis complete: ${state.rows} of ${state.total} moves.`
       : state.status === 'cancelled' ? 'Analysis stopped. Resume to continue; completed positions are cached on this device.'
-        : liveGameActive ? `Analysis paused while your live game is active. ${state.completed} of ${state.total} user moves checked.`
-          : `Analyzing user moves: ${state.completed} of ${state.total}.`;
+        : liveGameActive ? `Analysis paused while your live game is active. ${state.completed} of ${state.total} moves checked.`
+          : `Analyzing moves: ${state.completed} of ${state.total}.`;
 
   return <>
     <div className={`report-progress${state.status === 'error' ? ' report-error' : ''}`} role={state.status === 'error' ? 'alert' : 'status'} aria-live="polite">

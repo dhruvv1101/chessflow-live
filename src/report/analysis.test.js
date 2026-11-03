@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Chess } from 'chess.js';
 import { FREE_LIMITS } from './config.js';
-import { classifyMoveLoss, gamePhase, likelyTactic, normalizeAnalysisFen, timeContext, winProbability } from './analysis.js';
+import { classifyMoveLoss, gamePhase, likelyTactic, normalizeAnalysisFen, parseClockSeconds, timeContext, winProbability, hasLostAdvantage } from './analysis.js';
 
 describe('report move analysis helpers', () => {
   it('normalizes whitespace while preserving all FEN fields', () => {
@@ -23,17 +23,27 @@ describe('report move analysis helpers', () => {
     expect(classifyMoveLoss(FREE_LIMITS.lossThresholds.blunder)).toBe('Blunder');
   });
 
-  it('tags opening, middlegame and endgame positions', () => {
+  it('classifies phases from material and move number, not move number alone', () => {
     expect(gamePhase('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1', 1)).toBe('opening');
     expect(gamePhase('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 16', 31)).toBe('middlegame');
     expect(gamePhase('8/8/6k1/8/8/4K3/8/8 w - - 0 50', 99)).toBe('endgame');
+    expect(gamePhase('r4rk1/p1p1bppp/1pbqpn2/1B6/3P4/P1N1B3/1PPQ1PPP/R3K2R w KQ - 0 14', 27)).toBe('middlegame');
+    expect(gamePhase('r4rk1/p1p1bppp/1pBqpn2/8/3P4/P1N1B3/1PPQ1PPP/R3K2R b KQ - 0 14', 28)).toBe('middlegame');
   });
 
-  it('derives clock context from per-move clock comments', () => {
-    expect(timeContext('0:00:20')).toBe('time trouble');
-    expect(timeContext('0:01:30')).toBe('rushed');
-    expect(timeContext('0:05:00')).toBe('had plenty of time');
-    expect(timeContext(null)).toBe('unknown');
+  it('derives likely time context and elapsed time from clock data', () => {
+    expect(parseClockSeconds('0:09:59.2')).toBeCloseTo(599.2);
+    expect(timeContext({ spentSeconds: 1.2, remainingSeconds: 300 })).toMatchObject({ label: 'instant move', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 45, remainingSeconds: 300, averageSpentSeconds: 15 })).toMatchObject({ label: 'long think', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: 2, remainingSeconds: 20 })).toMatchObject({ label: 'low clock', confidence: 'likely' });
+    expect(timeContext({ spentSeconds: null, remainingSeconds: null })).toMatchObject({ label: 'unknown', confidence: null });
+  });
+
+  it('detects a lost advantage using configurable player-perspective thresholds', () => {
+    expect(hasLostAdvantage({ cp: 250 }, { cp: 100 })).toBe(true);
+    expect(hasLostAdvantage({ cp: 190 }, { cp: 0 })).toBe(false);
+    expect(hasLostAdvantage({ cp: 500 }, { cp: 450 })).toBe(false);
+    expect(hasLostAdvantage({ mate: 2 }, { cp: 500 })).toBe(true);
   });
 
   it('labels tactical patterns as likely and ties them to legal engine moves', () => {

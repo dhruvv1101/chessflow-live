@@ -3,16 +3,21 @@ import './report.css';
 import { reportChessComClient } from './client.js';
 import { useEntitlement } from './useEntitlement.js';
 import { clearReportGames, loadReportGames, saveReportGames } from './storage.js';
+import { clearAnalysisCache } from './analysisCache.js';
 import AnalysisProgress from './AnalysisProgress.jsx';
 
 function formatDate(timestamp) {
   return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
 }
 
+function countLabel(count, singular, plural = `${singular}s`) {
+  return `${count} ${count === 1 ? singular : plural}`;
+}
+
 function formatImportSummary(result, limits) {
   const { dropped } = result;
   const empty = result.games.length === 0 && result.gamesFetched === 0 ? ' No games were listed in the fetched archives.' : '';
-  return `Imported ${result.games.length} of up to ${limits.maxGames} most recent standard games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsFetched} fetched, ${result.archiveMonthsNotFetched} not fetched after reaching the game limit. ${result.gamesFetched} games checked. Dropped by reason: ${dropped.variants} variants, ${dropped.invalidPgn} unreadable PGNs, ${dropped.missingMetadata} missing game details, ${dropped.duplicates} duplicate games, ${dropped.overLimit} beyond the ${limits.maxGames}-game limit.${empty}`;
+  return `Imported ${result.games.length} of up to ${limits.maxGames} most recent standard games. Archive months: ${result.archiveMonthsFound} found, ${result.archiveMonthsFetched} fetched, ${result.archiveMonthsNotFetched} not fetched after reaching the game limit. ${result.gamesFetched} games checked. Dropped by reason: ${countLabel(dropped.variants, 'variant')}, ${countLabel(dropped.invalidPgn, 'invalid PGN')}, ${countLabel(dropped.noMoves, 'game with no moves', 'games with no moves')}, ${countLabel(dropped.missingMetadata, 'game missing details', 'games missing details')}, ${countLabel(dropped.duplicates, 'duplicate game')}, ${dropped.overLimit} beyond the ${limits.maxGames}-game limit.${empty}`;
 }
 
 export default function ReportPage() {
@@ -22,6 +27,7 @@ export default function ReportPage() {
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [importReasons, setImportReasons] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const controllerRef = useRef(null);
@@ -37,7 +43,7 @@ export default function ReportPage() {
   const importGames = async (event) => {
     event.preventDefault();
     if (busy) return;
-    setError(''); setMessage(''); setProgress(null);
+    setError(''); setMessage(''); setImportReasons([]); setProgress(null);
     const controller = new AbortController();
     controllerRef.current = controller;
     setBusy(true);
@@ -50,6 +56,7 @@ export default function ReportPage() {
       const stored = await saveReportGames(result.games, limits);
       setGames(stored);
       setMessage(formatImportSummary(result, limits));
+      setImportReasons(result.skippedGameReasons || []);
     } catch (failure) {
       setError(failure?.name === 'AbortError' ? 'Import cancelled.' : failure?.message || 'Could not import Chess.com games.');
     } finally {
@@ -62,7 +69,7 @@ export default function ReportPage() {
 
   const deleteImportedData = async () => {
     setError(''); setMessage('');
-    try { await clearReportGames(); setGames([]); setMessage('Imported game data deleted from this browser.'); }
+    try { await Promise.all([clearReportGames(), clearAnalysisCache()]); setGames([]); setMessage('Imported game data deleted from this browser.'); }
     catch { setError('Could not delete imported game data from this browser.'); }
   };
 
@@ -95,6 +102,10 @@ export default function ReportPage() {
       <AnalysisProgress games={games}/>
       {error && <p className="report-message report-error" role="alert">{error}</p>}
       {message && <p className="report-message" role="status" aria-live="polite">{message}</p>}
+      {importReasons.length > 0 && <details className="report-message">
+        <summary>Why some games were skipped ({importReasons.length} details)</summary>
+        <ul>{importReasons.map((entry, index) => <li key={`${entry.url}-${index}`}>{entry.url || `Game ${index + 1}`}: {entry.reason}</li>)}</ul>
+      </details>}
     </section>
 
     <section className="report-games-section" aria-labelledby="report-games-title">

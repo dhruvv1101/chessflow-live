@@ -19,6 +19,40 @@ describe('report Chess.com import', () => {
     expect(parsed.moves[0]).toMatchObject({ san: 'e4', uci: 'e2e4', ply: 1 });
   });
 
+  it('calculates elapsed seconds and remaining clock per move when time control is known', () => {
+    const timedPgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "*"]\n[TimeControl "600+5"]\n\n1. e4 {[%clk 0:09:59.2]} e5 {[%clk 0:09:58.1]} 2. Nf3 {[%clk 0:09:52.2]} *`;
+    const parsed = parseReportPgn({ url: 'https://chess.com/game/timed', pgn: timedPgn, rules: 'chess', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } }, 'TestPlayer');
+    expect(parsed.moves.map((move) => move.clockRemainingSeconds)).toEqual([599.2, 598.1, 592.2]);
+    expect(parsed.moves[0].timeSpentSeconds).toBeCloseTo(5.8);
+    expect(parsed.moves[1].timeSpentSeconds).toBeCloseTo(6.9);
+    expect(parsed.moves[2].timeSpentSeconds).toBeCloseTo(12);
+  });
+
+  it('does not infer spent time when a PGN clock exists but time control is missing', () => {
+    const noTimeControl = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "*"]\n\n1. e4 {[%clk 0:09:59]} e5 {[%clk 0:09:58]} 2. Nf3 {[%clk 0:09:50]} *`;
+    const parsed = parseReportPgn({ url: 'https://chess.com/game/unknown-clock', pgn: noTimeControl, rules: 'chess', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } }, 'TestPlayer');
+    expect(parsed.moves[0].clockRemainingSeconds).toBe(599);
+    expect(parsed.moves[0].timeSpentSeconds).toBeNull();
+    expect(parsed.moves[2].timeSpentSeconds).toBeNull();
+  });
+
+  it('returns specific reasons for PGNs that could not be parsed', () => {
+    const invalid = { url: 'https://chess.com/game/bad', pgn: '[Event "broken"]\n\n1. ThisIsNotAMove *', rules: 'chess', end_time: 100 };
+    const result = buildRecentGameSet([invalid], 'TestPlayer');
+    expect(result.dropped.invalidPgn).toBe(1);
+    expect(result.skippedGameReasons).toHaveLength(1);
+    expect(result.skippedGameReasons[0]).toMatchObject({ url: invalid.url, kind: 'invalid-pgn' });
+    expect(result.skippedGameReasons[0].reason).toMatch(/PGN parse failed:/);
+  });
+
+  it('reports result-only resignation games separately from malformed PGNs', () => {
+    const noMovesPgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "0-1"]\n[Termination "Opponent won by resignation"]\n\n0-1`;
+    const noMoves = { url: 'https://chess.com/game/no-moves', pgn: noMovesPgn, rules: 'chess', end_time: 101 };
+    const result = buildRecentGameSet([noMoves], 'TestPlayer');
+    expect(result.dropped).toMatchObject({ invalidPgn: 0, noMoves: 1 });
+    expect(result.skippedGameReasons[0]).toMatchObject({ kind: 'no-moves', reason: expect.stringContaining('Termination: Opponent won by resignation') });
+  });
+
   it('keeps the 25 newest standard games and reports every dropped reason', () => {
     const game = (id, end_time, rules = 'chess') => ({ url: `https://chess.com/game/${id}`, pgn, rules, time_class: 'rapid', white: { username: 'TestPlayer' }, black: { username: 'Opponent' }, end_time });
     const old = Math.floor(Date.UTC(2012, 0, 1) / 1000);
@@ -28,7 +62,7 @@ describe('report Chess.com import', () => {
     expect(new Set(result.games.map((entry) => entry.url)).size).toBe(25);
     expect(result.games[0].endTime).toBeGreaterThanOrEqual(result.games.at(-1).endTime);
     expect(result.skippedVariants).toBe(1);
-    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, missingMetadata: 1, duplicates: 1, overLimit: 7 });
+    expect(result.dropped).toEqual({ variants: 1, invalidPgn: 1, noMoves: 0, missingMetadata: 1, duplicates: 1, overLimit: 7 });
   });
 });
 
@@ -51,7 +85,7 @@ describe('report Chess.com client', () => {
     const imported = await client.importRecentGames('test', { maxGames: 25 });
     expect(imported.games).toEqual([]);
     expect(imported).toMatchObject({ archiveMonthsFound: 2, archiveMonthsFetched: 2, gamesFetched: 0 });
-    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 });
+    expect(imported.dropped).toEqual({ variants: 0, invalidPgn: 0, noMoves: 0, missingMetadata: 0, duplicates: 0, overLimit: 0 });
     expect(calls.map((url) => url.match(/month=\d+/)?.[0] || 'archives')).toEqual(['archives', 'month=11', 'month=11', 'month=10']);
     const octoberRequest = fetchImpl.mock.calls.at(-1)[1];
     expect(octoberRequest.headers['If-None-Match']).toBe('oct-v1');

@@ -6,6 +6,7 @@ function monthUrl(date, offset = 0) {
 }
 
 const samplePgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "1-0"]\n[ECO "C20"]\n\n1. e4 {[%clk 0:09:59]} e5 {[%clk 0:09:58]} 2. Nf3 1-0`;
+const noMovePgn = `[Event "Live Chess"]\n[White "TestPlayer"]\n[Black "Opponent"]\n[Result "0-1"]\n[Termination "Opponent won by resignation"]\n\n0-1`;
 
 test('opens and exits the report through the existing navigation', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -33,6 +34,7 @@ test('imports public standard games locally and fits in both themes', async ({ p
     return route.fulfill({ json: { games: [
       { url: 'https://www.chess.com/game/live/123', rules: 'chess', pgn: samplePgn, end_time: Math.floor(Date.now() / 1000), time_class: 'blitz', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } },
       { url: 'https://www.chess.com/game/live/variant', rules: 'chess960', pgn: samplePgn, end_time: Math.floor(Date.now() / 1000), time_class: 'blitz', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } },
+      { url: 'https://www.chess.com/game/live/no-moves', rules: 'chess', pgn: noMovePgn, end_time: Math.floor(Date.now() / 1000) - 1, time_class: 'blitz', white: { username: 'TestPlayer' }, black: { username: 'Opponent' } },
     ] } });
   });
 
@@ -52,7 +54,11 @@ test('imports public standard games locally and fits in both themes', async ({ p
     await expect(page.getByText('Your report starts here')).toBeVisible();
     await page.getByLabel('Chess.com username').fill('TestPlayer');
     await page.getByRole('button', { name: 'Import games' }).click();
-    await expect(page.getByText('Imported 1 recent games. Skipped 1 variant games.')).toBeVisible();
+    const importSummary = page.locator('.report-message[role="status"]');
+    await expect(importSummary).toContainText('Imported 1 of up to 25 most recent standard games.');
+    await expect(importSummary).toContainText('1 variant, 0 invalid PGNs, 1 game with no moves');
+    await page.getByText('Why some games were skipped (1 details)').click();
+    await expect(page.getByText(/PGN has headers and a result but no moves.*Termination: Opponent won by resignation/)).toBeVisible();
     await expect(page.getByText('TestPlayer vs Opponent')).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-effective-theme', theme);
     await expect(page.locator('body')).toHaveJSProperty('scrollWidth', 390);
