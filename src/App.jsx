@@ -18,6 +18,7 @@ import { acceptPracticeMove, captureReviewState, createPracticeSession, judgePra
 import { supabase } from './cloud/supabase.js';
 import { saveLocalGame } from './cloud/savedGames.js';
 import { classifyGame, loadOpeningDatabase } from './openings.js';
+import { setLiveGameActive } from './report/analysisCoordinator.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -89,6 +90,11 @@ function App() {
   const config = DIFFICULTIES[difficulty];
   const gameOver = status.kind === 'checkmate' || status.kind === 'stalemate' || status.kind === 'draw' || resigned;
   const moves = useMemo(() => getMoveList(chess), [fen]);
+  useEffect(() => {
+    const active = !gameOver && reviewState === 'idle' && !practiceSession
+      && (mode === 'local' ? Boolean(localSession) : gameVersion > 0);
+    setLiveGameActive(active);
+  }, [gameOver, gameVersion, localSession, mode, practiceSession, reviewState]);
   const timeline = useMemo(() => reviewTimeline || buildTimeline(startFenRef.current, chess.history()), [fen, gameVersion, reviewTimeline]);
   const isReviewTimeline = Boolean(reviewTimeline);
   const practiceTimeline = useMemo(() => practiceSession ? buildTimeline(practiceSession.startFen, practiceSession.sanHistory || []) : null, [practiceSession]);

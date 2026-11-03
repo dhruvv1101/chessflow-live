@@ -3,6 +3,7 @@ import './report.css';
 import { reportChessComClient } from './client.js';
 import { useEntitlement } from './useEntitlement.js';
 import { clearReportGames, loadReportGames, saveReportGames } from './storage.js';
+import AnalysisProgress from './AnalysisProgress.jsx';
 
 function formatDate(timestamp) {
   return timestamp ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(timestamp)) : 'Date unavailable';
@@ -91,6 +92,7 @@ export default function ReportPage() {
       </form>
       <p id="report-limits" className="small-meta">Only standard chess games, the {limits.maxGames} most recent, are kept.</p>
       {progress && <div className="report-progress" role="status" aria-live="polite"><p>{progress.message}</p><progress aria-label="Import progress" max={Math.max(1, progress.total)} value={progress.completed}/></div>}
+      <AnalysisProgress games={games}/>
       {error && <p className="report-message report-error" role="alert">{error}</p>}
       {message && <p className="report-message" role="status" aria-live="polite">{message}</p>}
     </section>
