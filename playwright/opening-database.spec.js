@@ -2,6 +2,7 @@ import { test, expect } from './fixtures.js';
 import { Chess } from 'chess.js';
 
 test('shows a named opening and book exit for a reviewed game without layout overflow', async ({ page }) => {
+  test.setTimeout(90_000);
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });

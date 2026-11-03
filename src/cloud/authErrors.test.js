@@ -10,8 +10,9 @@ describe('friendly authentication errors', () => {
     expect(authErrorMessage({ message: 'raw server JSON: private detail' })).not.toContain('private detail');
   });
 
-  it('defaults to GitHub and email, permits hiding them, and keeps Google opt-in', () => {
-    expect(enabledAuthProviders({})).toEqual({ github: true, email: true, google: false });
+  it('defaults to GitHub, email and Google, and permits hiding each provider', () => {
+    expect(enabledAuthProviders({})).toEqual({ github: true, email: true, google: true });
+    expect(enabledAuthProviders({ VITE_AUTH_GOOGLE_ENABLED: 'false' })).toEqual({ github: true, email: true, google: false });
     expect(enabledAuthProviders({ VITE_AUTH_GITHUB_ENABLED: 'false', VITE_AUTH_EMAIL_ENABLED: 'false', VITE_AUTH_GOOGLE_ENABLED: 'true' })).toEqual({ github: false, email: false, google: true });
   });
 

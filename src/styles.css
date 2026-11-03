@@ -471,6 +471,8 @@ button:focus-visible, textarea:focus-visible, a:focus-visible, [tabindex="0"]:fo
 :root[data-effective-theme="dark"] .analysis-classification { color: #152006; }
 :root[data-effective-theme="dark"] .analysis-classification-blunder { color: #fff; }
 @media (max-width: 560px) {
+  .app-shell:not(.report-page) > .topbar { flex-wrap: wrap; padding-block: 8px; }
+  .app-shell:not(.report-page) > .topbar > .top-actions { width: 100%; min-width: 0; flex-wrap: wrap; justify-content: space-between; }
   .move-navigation { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .move-navigation .move-indicator { grid-column: 1 / -1; grid-row: 1; }
   .coach-explanation { grid-template-columns: 1fr; }

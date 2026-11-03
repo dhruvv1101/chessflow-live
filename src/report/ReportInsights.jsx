@@ -1,0 +1,135 @@
+import { useState } from 'react';
+import { buildMoveExplanation } from './explanations.js';
+import RadialOpeningTree from './RadialOpeningTree.jsx';
+import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
+import { useLessonActions } from './LessonsFeature.jsx';
+import { normalizeLessonFen } from './lessonData.js';
+import { formatCount, formatLeakLossSummary, formatLostSwing, formatSeconds } from './formatting.js';
+import { rankLeaks } from './leaks.js';
+
+function formatChange(value) {
+  if (!Number.isFinite(value)) return '—';
+  const percent = value * 100;
+  return `${percent > 0 ? '+' : ''}${Math.round(percent)}%`;
+}
+
+function ExplanationDetails({ explanation }) {
+  return <div className="report-insight-explanation">
+    <p><strong>What happened?</strong> {explanation.played} was marked {explanation.classification}.</p>
+    <p><strong>Evaluation:</strong> {explanation.evaluationBefore} before → {explanation.evaluationAfter} after.</p>
+    <p><strong>Why?</strong> {explanation.why}</p>
+    <p><strong>Opponent’s best line:</strong> {explanation.opponentLine.length ? explanation.opponentLine.join(' ') : explanation.opponentReply || 'No line is available yet.'}</p>
+    <p><strong>Best alternative:</strong> {explanation.bestMove || 'No best move stored.'} — {explanation.bestMoveIdea}</p>
+    {explanation.tacticalContext.map((context) => <p key={context}><strong>Likely tactic:</strong> {context}</p>)}
+    {explanation.opponentContext && <p><strong>Opponent context:</strong> {explanation.opponentContext}</p>}
+  </div>;
+}
+
+function LeakCard({ leak, rank, games = [], onShowTree, onFilterGames }) {
+  const { lessons, openLesson } = useLessonActions();
+  const [openExample, setOpenExample] = useState(null);
+  const [explanation, setExplanation] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const explain = async (example) => {
+    const key = `${example.gameId}:${example.ply}`;
+    if (openExample === key) { setOpenExample(null); return; }
+    setOpenExample(key);
+    setExplanation(null);
+    setError('');
+    setLoading(true);
+    try { setExplanation(await buildMoveExplanation(example.row)); }
+    catch { setError('Could not load an engine line for this move.'); }
+    finally { setLoading(false); }
+  };
+
+  const firstExample = leak.examples?.[0];
+  const firstRow = firstExample?.row;
+  const firstGame = games.find((game) => game.url === firstExample?.gameId);
+  const hasLesson = Boolean(firstRow && lessons.some((lesson) => lesson.normalizedFen === normalizeLessonFen(firstRow.fenBefore) && (!lesson.playedMove || lesson.playedMove === firstRow.playedSan)));
+
+  return <article className="folder-card report-insight-card">
+    <p className="meta-line">#{rank} · {leak.kind.replaceAll('-', ' ').toUpperCase()}</p>
+    <h3>{leak.title}</h3>
+    <p className="small-meta">{formatLeakLossSummary(leak)} across {formatCount(leak.gamesAffected, 'game')}.</p>
+    <div className="report-leak-actions">
+      {firstExample && <button className="button button-outline" type="button" aria-expanded={openExample === `${firstExample.gameId}:${firstExample.ply}`} onClick={() => explain(firstExample)}>Explain</button>}
+      <button className="button button-outline" type="button" onClick={() => { onShowTree(leak); onFilterGames(leak.examples.map((example) => example.gameId)); }}>Show on tree</button>
+      {firstExample && <button className="button button-outline" type="button" onClick={() => openLesson(firstRow, firstGame, { kind: 'leak', tags: [...(firstRow?.tacticTags || []).map((entry) => entry.kind), leak.id] })}>{hasLesson ? '▣ Lesson saved' : 'Save as lesson'}</button>}
+    </div>
+    {leak.lowConfidence && <span className="review-badge badge-peach report-confidence-badge">Low confidence · fewer than 3 games</span>}
+    {leak.kind === 'conversion' && <p className="small-meta">Average lost-advantage swing: {formatLostSwing(leak.averageSwing)}.</p>}
+    {leak.kind === 'missed-chance' && <p className="small-meta">Examples include time spent on your reply.</p>}
+    {leak.kind === 'time-management' && leak.baseline && <p className="small-meta">Mistakes in {Math.round(leak.baseline.contextRate * 100)}% of {leak.baseline.context} moves vs {Math.round(leak.baseline.normalRate * 100)}% of normal-pace moves (n = {leak.baseline.contextMoves} / {leak.baseline.normalMoves}).</p>}
+    <ul className="report-insight-examples">{leak.examples.map((example) => {
+      const key = `${example.gameId}:${example.ply}`;
+      return <li key={key}>
+        <span>{example.move || `Ply ${example.ply}`} · {example.timeContext}{example.replyTimeSeconds != null ? ` · ${formatSeconds(example.replyTimeSeconds)} reply` : ''}</span>
+        <button className="button button-outline" type="button" aria-expanded={openExample === key} onClick={() => explain(example)}>
+          {openExample === key ? 'Hide explanation' : 'Explain example'}
+        </button>
+        {openExample === key && <div className="report-insight-explanation-wrap">
+          {loading && <p role="status">Loading engine line…</p>}
+          {error && <p role="alert">{error}</p>}
+          {explanation && <><ExplanationDetails explanation={explanation}/><button className="button button-outline" type="button" onClick={() => openLesson(example.row, games.find((game) => game.url === example.gameId), { kind: 'move', tags: [...(example.row?.tacticTags || []).map((entry) => entry.kind), leak.id] })}>Save explanation as lesson</button></>}
+        </div>}
+      </li>;
+    })}</ul>
+  </article>;
+}
+
+export default function ReportInsights({ leaks, openingRows, firstMistakes, tree, games = [], openingStatus = 'ready', leaksStatus = 'ready', onFilterGames = () => {} }) {
+  const [highlightedPositionKeys, setHighlightedPositionKeys] = useState([]);
+  const rankedLeaks = rankLeaks(leaks);
+  const showLeakOnTree = (leak) => {
+    const keys = leak.examples.map((example) => example.row?.positionKey || example.row?.fenBefore?.split(' ').slice(0, 4).join(' ')).filter(Boolean);
+    setHighlightedPositionKeys(keys);
+    document.getElementById('report-radial-tree-title')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+  };
+  const openingTable = (color, title) => {
+    const items = openingRows.filter((opening) => opening.color === color);
+    return <section className="report-insight-section" aria-label={`${title} opening performance`}>
+      <h4>{title}</h4>
+      {items.length ? <div className="report-analysis-table-wrap folder-card report-opening-table-wrap"><table className="report-analysis-table report-opening-table">
+        <thead><tr><th scope="col">Opening</th><th scope="col">Games <ReportHelpTrigger label="What games means"/></th><th scope="col">W / D / L <ReportHelpTrigger label="What W D L means"/></th><th scope="col">Avg. win-probability change <ReportHelpTrigger label="What average win-probability change means"/></th><th scope="col">Confidence <ReportHelpTrigger label="What confidence means"/></th></tr></thead>
+        <tbody>{items.map((opening) => <tr key={`${color}:${opening.eco}:${opening.name}`}>
+          <th scope="row">{opening.eco} · {opening.name}</th><td>{opening.games}</td><td>{opening.wins} / {opening.draws} / {opening.losses}</td>
+          <td>{formatChange(opening.averageWinProbabilityChange)}</td><td>{opening.lowConfidence ? <span className="review-badge badge-peach report-confidence-badge">Low confidence</span> : 'Good sample'}</td>
+        </tr>)}</tbody>
+      </table></div> : <p className="folder-card report-insight-empty">No named openings have enough {color} games for a summary.</p>}
+    </section>;
+  };
+  return <section className="report-insights" aria-labelledby="report-insights-title">
+    <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div><ReportHelpTrigger label="How to read this report"/></div>
+    <section className="report-insight-section" aria-labelledby="report-opening-table-title">
+      <RadialOpeningTree tree={tree} leaks={leaks} highlightedPositionKeys={highlightedPositionKeys} status={openingStatus} onShowGames={(gameId) => onFilterGames([gameId])}/>
+      <h3 id="report-opening-table-title">Opening performance</h3>
+      {openingStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Opening tree is being prepared…</p>
+        : openingStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Opening names are unavailable. Your imported games remain saved.</p>
+          : openingStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p> : <>
+            {openingTable('white', 'White')}
+            {openingTable('black', 'Black')}
+          </>}
+    </section>
+    <section className="report-insight-section" aria-labelledby="report-leaks-title">
+      <h3 id="report-leaks-title">Leaks <ReportHelpTrigger label="How leaks are ranked"/></h3>
+      {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Stockfish analysis is in progress…</p>
+        : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">Stockfish analysis failed. Your imported games are still saved; retry by refreshing this report.</p>
+          : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
+          : rankedLeaks.length ? <div className="report-insight-grid">{rankedLeaks.map((leak, index) => <LeakCard key={leak.id} rank={index + 1} leak={leak} games={games} onShowTree={showLeakOnTree} onFilterGames={onFilterGames}/>)}</div>
+            : <p className="folder-card report-insight-empty">No recurring leaks yet. Patterns need at least two games.</p>}
+    </section>
+    <section className="report-insight-section" aria-labelledby="report-first-mistake-title">
+      <h3 id="report-first-mistake-title">First big mistake in lost games <ReportHelpTrigger label="How first big mistakes are counted"/></h3>
+      {leaksStatus === 'loading' ? <p className="folder-card report-insight-empty" role="status">Waiting for move analysis…</p>
+        : leaksStatus === 'error' ? <p className="folder-card report-insight-empty" role="alert">First-mistake summary is unavailable until analysis completes.</p>
+          : leaksStatus === 'empty' ? <p className="folder-card report-insight-empty">No games match these filters.</p>
+            : !firstMistakes.gamesLost ? <p className="folder-card report-insight-empty">No completed lost games in this report.</p> : <article className="folder-card report-first-mistake-card">
+        <p>{firstMistakes.gamesWithFirstMistake} of {firstMistakes.gamesLost} lost games had a qualifying first mistake.</p>
+        {firstMistakes.averagePly != null && <p className="small-meta">Average ply {firstMistakes.averagePly.toFixed(1)} · most common phase: {firstMistakes.mostCommonPhase || 'unknown'} · most common tag: {firstMistakes.mostCommonTag || 'none recorded'}.</p>}
+        <ul>{firstMistakes.entries.map((entry) => <li key={entry.gameId}>{entry.move} · {entry.phase} · {entry.timeSpentSeconds == null ? 'time unknown' : formatSeconds(entry.timeSpentSeconds)} · {entry.tag || 'no tactic tag'}</li>)}</ul>
+      </article>}
+    </section>
+  </section>;
+}

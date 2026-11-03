@@ -18,6 +18,9 @@ import { acceptPracticeMove, captureReviewState, createPracticeSession, judgePra
 import { supabase } from './cloud/supabase.js';
 import { saveLocalGame } from './cloud/savedGames.js';
 import { classifyGame, loadOpeningDatabase } from './openings.js';
+import { setLiveGameActive } from './report/analysisCoordinator.js';
+import { REPORT_PRACTICE_EVENT } from './report/practiceBridge.js';
+import { REPORT_THEME_CHANGED } from './report/reportSettings.js';
 
 const initialGame = () => new Chess();
 const sideName = (color) => color === 'w' ? 'White' : 'Black';
@@ -75,6 +78,7 @@ function App() {
   const navigationRequestRef = useRef(0);
   const reviewRunRef = useRef(0);
   const practiceRequestIdRef = useRef(0);
+  const reportPracticeRequestRef = useRef(0);
   const practiceReturnRef = useRef(null);
   const pendingPracticeMoveRef = useRef(null);
   const startFenRef = useRef(initialGame().fen());
@@ -89,6 +93,11 @@ function App() {
   const config = DIFFICULTIES[difficulty];
   const gameOver = status.kind === 'checkmate' || status.kind === 'stalemate' || status.kind === 'draw' || resigned;
   const moves = useMemo(() => getMoveList(chess), [fen]);
+  useEffect(() => {
+    const active = !gameOver && reviewState === 'idle' && !practiceSession
+      && (mode === 'local' ? Boolean(localSession) : gameVersion > 0);
+    setLiveGameActive(active);
+  }, [gameOver, gameVersion, localSession, mode, practiceSession, reviewState]);
   const timeline = useMemo(() => reviewTimeline || buildTimeline(startFenRef.current, chess.history()), [fen, gameVersion, reviewTimeline]);
   const isReviewTimeline = Boolean(reviewTimeline);
   const practiceTimeline = useMemo(() => practiceSession ? buildTimeline(practiceSession.startFen, practiceSession.sanHistory || []) : null, [practiceSession]);
@@ -151,6 +160,12 @@ function App() {
     media?.addEventListener?.('change', apply);
     return () => media?.removeEventListener?.('change', apply);
   }, [settings.theme, settings.reduceMotion]);
+
+  useEffect(() => {
+    const syncSettings = () => setSettings(loadSettings());
+    window.addEventListener(REPORT_THEME_CHANGED, syncSettings);
+    return () => window.removeEventListener(REPORT_THEME_CHANGED, syncSettings);
+  }, []);
 
   const changeSettings = (patch) => {
     const next = saveSettings({ ...settings, ...patch });
@@ -327,14 +342,48 @@ function App() {
 
   const selectedReviewRow = reviewRows.find((row) => row.ply === activePly) || null;
   const startPractice = useCallback((row) => {
-    if (!row?.previousFen || !row?.bestUci || !['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label)) return;
+    if (!row?.previousFen || !row?.bestUci || (!row.practiceFromPosition && !['Inaccuracy', 'Mistake', 'Blunder'].includes(row.label))) return;
     practiceRequestIdRef.current += 1; setPracticeBusy(false); setPracticeMovePending(false);
-    practiceReturnRef.current = captureReviewState({ selectedPly, scrollTop: moveListRef.current?.scrollTop || 0 });
+    practiceReturnRef.current = { ...captureReviewState({ selectedPly, scrollTop: moveListRef.current?.scrollTop || 0 }), routeHash: window.location.hash };
     const lines = (row.variations || []).map((line) => ({ uci: line.uci?.[0], san: line.san?.[0], cp: line.cp, mate: line.mate })).filter((line) => line.uci);
-    setPracticeSession(createPracticeSession({ startFen: row.previousFen, color: row.color, bestUci: row.bestUci, bestSan: row.bestSan, lines, bestScore: row.bestScore || { cp: row.bestWhiteCp }, originalMoveUci: row.uci, originalMoveSan: row.san, difficulty, gameKey: pgn || 'live-game', ply: row.ply }));
+    setPracticeSession(createPracticeSession({ startFen: row.previousFen, color: row.color, bestUci: row.bestUci, bestSan: row.bestSan, lines, bestScore: row.bestScore || { cp: row.bestWhiteCp }, originalMoveUci: row.uci, originalMoveSan: row.san, difficulty, gameKey: row.gameKey || pgn || 'live-game', ply: row.ply }));
     setPracticeFeedback('Find a better move for this position.'); setPracticeHintLevel(0); setSelectedSquare(null);
     setNotice(`Practice mode: find a better move for ${row.color === 'w' ? 'White' : 'Black'}.`);
   }, [difficulty, pgn, selectedPly]);
+  useEffect(() => {
+    const prepareReportPractice = async (event) => {
+      let board;
+      try { board = new Chess(event.detail?.fen); }
+      catch { window.location.hash = ''; setNotice('This practice position is invalid.'); return; }
+      const fen = board.fen();
+      const color = board.turn();
+      const requestId = ++reportPracticeRequestRef.current;
+      const returnHash = window.location.hash;
+      window.location.hash = '';
+      setNotice('Stockfish is preparing this practice position…');
+      try {
+        const result = await search(fen, { movetime: settings.hintTime, skill: 20, multipv: ENGINE.multiPv, color }, 'hint');
+        if (requestId !== reportPracticeRequestRef.current) return;
+        const bestUci = result.best || result.lines?.[0]?.move;
+        const bestLine = result.lines?.find((line) => line.move === bestUci) || result.lines?.[0];
+        const bestVariation = legalVariation(fen, [bestUci], 1);
+        if (!bestUci || !bestVariation.uci.length || !bestVariation.san.length) throw new Error('Stockfish did not return a legal best move.');
+        const variations = (result.lines || []).map((line) => ({ ...line, ...legalVariation(fen, line.pv || [line.move]) })).filter((line) => line.uci?.length && line.san?.length);
+        if (!variations.some((line) => line.uci[0] === bestUci)) variations.unshift({ uci: bestVariation.uci, san: bestVariation.san, cp: bestLine?.cp ?? 0, mate: bestLine?.mate ?? null });
+        startPractice({
+          practiceFromPosition: true, previousFen: fen, color, bestUci, bestSan: bestVariation.san[0],
+          bestScore: { cp: bestLine?.cp ?? 0, mate: bestLine?.mate ?? null }, variations,
+          gameKey: event.detail?.gameKey || `position:${fen.split(' ').slice(0, 4).join(' ')}`,
+          ply: Number(event.detail?.ply) || 0,
+        });
+        practiceReturnRef.current = { ...practiceReturnRef.current, routeHash: returnHash };
+      } catch (error) {
+        if (requestId === reportPracticeRequestRef.current) setNotice(`Could not prepare practice: ${error.message}`);
+      }
+    };
+    window.addEventListener(REPORT_PRACTICE_EVENT, prepareReportPractice);
+    return () => window.removeEventListener(REPORT_PRACTICE_EVENT, prepareReportPractice);
+  }, [search, settings.hintTime, startPractice]);
   const backToReview = () => {
     practiceRequestIdRef.current += 1;
     setPracticeBusy(false); setPracticeSession(null); setPracticeFeedback(''); setPracticeHintLevel(0); pendingPracticeMoveRef.current = null;
@@ -342,6 +391,7 @@ function App() {
     setSelectedPly(restored.selectedPly);
     requestAnimationFrame(() => { if (moveListRef.current) moveListRef.current.scrollTop = restored.scrollTop; });
     setNotice('Back to your game review.');
+    if (practiceReturnRef.current?.routeHash) window.location.hash = practiceReturnRef.current.routeHash;
   };
   const markPracticeDone = (session, result) => {
     const done = { ...session, phase: 'done', result };

@@ -1,0 +1,150 @@
+.report-filter-card { margin-top: 22px; }
+.report-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); align-items: end; gap: 12px; margin: 14px 0 8px; }
+.report-filter-fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.report-filter-fieldset legend { margin-bottom: 5px; font-size: 11px; font-weight: 850; }
+.report-filter-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.report-filter-options .button { min-height: 38px; padding: 7px 10px; }
+.report-filter-card .setting-select { display: grid; gap: 4px; font-size: 11px; font-weight: 850; }
+.report-filter-card .setting-select select, .report-filter-card .setting-select input { box-sizing: border-box; width: 100%; min-height: 42px; padding: 8px 10px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); color: var(--text); box-shadow: var(--control-shadow); }
+.report-import-card { padding: 0; overflow: hidden; }
+.report-import-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 16px; cursor: pointer; font-size: 13px; font-weight: 950; }
+.report-import-summary:focus-visible { outline: 4px solid var(--pink); outline-offset: -4px; }
+.report-import-summary::marker { color: var(--purple); }
+.report-import-state { color: var(--grey); font-size: 10px; font-weight: 800; text-align: right; }
+.report-import-content { position: relative; padding: 18px; border-top: var(--line); }
+.report-import-content .folder-head { margin-top: 2px; }
+.report-section-heading { align-items: center; }
+.report-tree-section { min-width: 0; margin: 18px 0 24px; }
+.report-tree-heading, .report-tree-detail-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.report-tree-heading h3, .report-tree-detail h4 { margin: 3px 0 8px; }
+.report-tree-side-toggle, .report-tree-zoom { display: flex; flex-wrap: wrap; gap: 6px; }
+.report-tree-controls { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; margin: 12px 0; }
+.report-tree-controls .setting-select { min-width: 150px; }
+.report-tree-controls input[type="range"] { accent-color: var(--purple); }
+.report-tree-check { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; color: var(--text); font-size: 11px; font-weight: 800; }
+.report-tree-check input { width: 17px; height: 17px; accent-color: var(--purple); }
+.report-tree-card { min-width: 0; padding: 12px; overflow: hidden; }
+.report-tree-view-layout { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.report-tree-view-layout.has-selection { grid-template-columns: minmax(0, 1fr) minmax(250px, .42fr); align-items: start; }
+.report-radial-svg { display: block; width: min(100%, 680px); height: auto; margin-inline: auto; aspect-ratio: 1; touch-action: none; cursor: grab; }
+.report-radial-svg:active { cursor: grabbing; }
+.report-tree-ring { fill: none; stroke: var(--grey); stroke-width: 1; stroke-dasharray: 2 5; pointer-events: none; }
+.report-tree-ring-label, .report-tree-label, .report-tree-opening-label, .report-tree-root-label { paint-order: stroke fill; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; pointer-events: none; }
+.report-tree-ring-label { fill: var(--text); stroke-width: 4px; font-size: 9px; font-weight: 850; }
+.report-tree-link { stroke: var(--text); stroke-width: 1.5px; pointer-events: none; }
+.report-tree-link.is-path { stroke: var(--text); stroke-width: 3px; stroke-dasharray: 7 2; }
+.report-tree-link.is-dimmed { stroke: var(--grey); stroke-width: 1.25px; }
+.report-tree-node { cursor: pointer; outline: none; }
+.report-tree-node circle { stroke: var(--text); stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
+.report-tree-node circle.is-low-confidence { stroke: var(--text); stroke-dasharray: 3 3; }
+.report-tree-node circle.is-leak { stroke: var(--text); stroke-width: 4; }
+.report-tree-node circle.is-leak.is-low-confidence { stroke-dasharray: 3 3; }
+.report-tree-node circle.is-highlighted { stroke: var(--text); stroke-width: 4; }
+.report-tree-node circle.is-selected, .report-tree-node:focus-visible circle { stroke: var(--text); stroke-width: 4; stroke-dasharray: 2 2; }
+.report-tree-node .report-tree-leak-marker { fill: var(--pink); stroke: var(--text); stroke-width: 1.5; }
+.report-tree-node.is-dimmed { opacity: .48; }
+.report-tree-label, .report-tree-opening-label { fill: var(--text); font: inherit; font-size: 12px; font-weight: 900; }
+.report-tree-opening-label { fill: var(--text); font-size: 12px; }
+.report-tree-root-label { fill: var(--text); stroke-width: 4px; font-size: 12px; font-weight: 950; }
+.report-tree-root-label:focus-visible { stroke: var(--surface); stroke-width: 4px; text-decoration: underline; text-decoration-color: var(--text); text-decoration-thickness: 3px; text-underline-offset: 4px; outline: none; }
+.report-help-trigger { display: inline-grid; width: 23px; min-width: 23px; height: 23px; min-height: 23px; padding: 0; place-items: center; border-radius: 50%; font-size: 12px; line-height: 1; vertical-align: middle; }
+.report-help-trigger:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.report-help-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--shadow) 72%, transparent); }
+.report-help-drawer { width: min(760px, 100%); max-height: min(86vh, 820px); overflow: auto; padding: 20px; color: var(--text); background: var(--surface); box-shadow: var(--card-shadow); }
+.report-help-heading { position: sticky; top: -20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; background: var(--surface); }
+.report-help-heading h2 { margin: 2px 0; }
+.report-help-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.report-help-items article { min-width: 0; padding: 10px 12px; border: var(--line); border-radius: var(--card-radius); background: var(--surface-alt); }
+.report-help-items h3 { margin: 0 0 5px; font-size: 13px; }
+.report-help-items p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.5; }
+.report-lessons-section { margin-top: 22px; }
+.report-lessons-actions, .report-lesson-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.report-lesson-filters { margin: 12px 0; }
+.report-lesson-filters label, .report-lesson-editor label, .report-saved-lesson label { display: grid; min-width: min(100%, 150px); gap: 4px; color: var(--text); font-size: 11px; font-weight: 850; }
+.report-lesson-filters select, .report-lesson-editor textarea, .report-saved-lesson textarea { width: 100%; min-height: 40px; padding: 8px 10px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); color: var(--text); box-shadow: var(--control-shadow); }
+.report-lesson-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 10px; padding: 0; list-style: none; }
+.report-lesson-list > li { min-width: 0; padding: 14px; }
+.report-saved-lesson { display: grid; align-content: start; gap: 8px; }
+.report-saved-lesson p { margin: 0; overflow-wrap: anywhere; }
+.report-lesson-editor { width: min(720px, 100%); max-height: min(88vh, 860px); overflow: auto; display: grid; gap: 11px; padding: 18px; color: var(--text); background: var(--surface); box-shadow: var(--card-shadow); }
+.report-lesson-editor textarea, .report-saved-lesson textarea { min-height: 64px; resize: vertical; }
+.report-lesson-editor button:focus-visible, .report-lessons-section button:focus-visible, .report-lessons-section select:focus-visible, .report-lessons-section textarea:focus-visible { outline: 3px solid var(--pink); outline-offset: 2px; }
+.report-hidden-input, .report-screenreader { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.report-tree-note-marker, .report-eval-note-marker { fill: var(--text); font-size: 11px; font-weight: 950; paint-order: stroke fill; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.report-eval-note-marker { pointer-events: none; }
+.report-tree-legend { margin-top: 8px; padding: 8px 3px 2px; border-top: var(--line); color: var(--text); font-size: 10px; font-weight: 750; }
+.report-tree-legend summary { width: fit-content; cursor: pointer; }
+.report-tree-legend summary:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 3px; }
+.report-tree-legend-content { display: flex; flex-wrap: wrap; gap: 10px 16px; padding-top: 8px; }
+.report-tree-legend-content span { display: inline-flex; align-items: center; gap: 5px; }
+.report-tree-legend i { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--text); border-radius: 50%; }
+.report-legend-worse { background: var(--purple); }
+.report-legend-neutral { background: var(--surface-alt); }
+.report-legend-better { background: var(--yellow); }
+.report-legend-size { width: 16px !important; height: 16px !important; background: var(--surface-alt); }
+.report-legend-leak { outline: 2px solid var(--pink); }
+.report-legend-low { border-style: dashed !important; background: var(--surface-alt); }
+.report-tree-table { display: grid; gap: 6px; max-height: 560px; overflow: auto; padding: 4px 8px 4px 24px; }
+.report-tree-table li { margin-left: calc(var(--tree-depth) * 10px); }
+.report-tree-table .button { max-width: 100%; text-align: left; white-space: normal; }
+.report-tree-detail { margin-top: 12px; padding: 16px; }
+.report-tree-view-layout .report-tree-detail { position: sticky; top: 12px; max-height: min(72vh, 680px); overflow: auto; }
+.report-tree-detail > p, .report-tree-detail li, .report-tree-detail a { overflow-wrap: anywhere; }
+.report-fen-board { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); width: min(100%, 248px); aspect-ratio: 1; margin: 12px 0; overflow: hidden; border: var(--line); border-radius: var(--card-radius); box-shadow: var(--card-shadow); }
+.report-fen-square { display: grid; width: 100%; height: 100%; place-items: center; min-width: 0; min-height: 0; color: var(--text); font-size: clamp(15px, 4vw, 25px); line-height: 1; }
+.report-fen-square.is-light { background: var(--surface-alt); }
+.report-fen-square.is-dark { background: var(--decor-purple); }
+.report-fen-square.piece-white { color: var(--piece-white-fill); -webkit-text-stroke: 1.5px var(--black-fill); }
+.report-fen-square.piece-black { color: var(--black-fill); -webkit-text-stroke: 1.5px var(--piece-dark-outline); }
+.report-fen-square.is-last-move { box-shadow: inset 0 0 0 3px var(--yellow); }
+.report-tree-sequence { padding: 8px; border: var(--line); border-radius: var(--control-radius); background: var(--surface-alt); font-size: 12px; font-weight: 850; overflow-wrap: anywhere; }
+.report-tree-section button:focus-visible, .report-tree-section a:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 2px; }
+.report-games-actions, .report-leak-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.report-game-card.is-selected { outline: 3px solid var(--purple); outline-offset: 2px; }
+.report-game-analysis-panel { min-width: 0; margin-top: 16px; padding-top: 12px; border-top: var(--line); }
+.report-eval-wrap { min-width: 0; }
+.report-eval-heading h4 { margin: 0 0 3px; }
+.report-eval-heading p { margin-top: 0; }
+.report-eval-graph { display: block; width: 100%; max-height: 320px; overflow: visible; border: var(--line); border-radius: var(--card-radius); background: var(--surface-alt); }
+.report-eval-grid { stroke: var(--divider); stroke-width: 1; opacity: .45; }
+.report-eval-even { stroke: var(--neutral, var(--grey)); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.report-eval-axis { fill: var(--grey); font: inherit; font-size: 9px; }
+.report-eval-line { fill: none; stroke: var(--lime); stroke-width: 3; vector-effect: non-scaling-stroke; stroke-linecap: round; stroke-linejoin: round; }
+.report-eval-marker { cursor: pointer; outline: none; }
+.report-eval-marker circle, .report-eval-marker rect, .report-eval-marker path { stroke: var(--surface); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.report-eval-marker:focus-visible circle, .report-eval-marker:focus-visible rect, .report-eval-marker:focus-visible path { stroke: var(--focus-color, var(--pink)); stroke-width: 4; }
+.report-eval-legend { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 8px 0; color: var(--text); font-size: 10px; font-weight: 800; }
+.report-eval-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.report-eval-legend i { width: 12px; height: 12px; border: 2px solid var(--outline); border-radius: 50%; }
+.report-eval-legend .is-inaccuracy { background: var(--yellow); }
+.report-eval-legend .is-mistake { background: var(--amber, var(--peach)); }
+.report-eval-legend .is-blunder { background: var(--pink); }
+.report-eval-legend i.is-mistake { border-radius: 0; transform: rotate(45deg); }
+.report-eval-legend i.is-blunder { border-radius: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.report-eval-legend .is-even { border-style: dashed; background: var(--surface-alt); }
+.report-eval-explanation { margin-top: 10px; padding: 12px; }
+.report-eval-explanation h5 { margin: 4px 0; }
+.report-games-count { margin: 0 0 10px; }
+@media (prefers-reduced-motion: reduce) { .report-tree-section *, .report-tree-section *::before, .report-tree-section *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+
+@media (max-width: 560px) {
+  .report-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-filter-fieldset { grid-column: 1 / -1; }
+  .report-import-summary { align-items: start; padding: 12px; font-size: 12px; }
+  .report-import-state { max-width: 48%; }
+  .report-import-content { padding: 13px; }
+  .report-tree-heading { align-items: start; flex-direction: column; }
+  .report-tree-controls { align-items: stretch; }
+  .report-tree-controls > * { max-width: 100%; }
+  .report-tree-card { padding: 6px; }
+  .report-tree-label { font-size: 11px; }
+  .report-tree-opening-label { font-size: 11px; }
+  .report-tree-detail { padding: 12px; }
+  .report-tree-view-layout.has-selection { display: block; }
+  .report-tree-view-layout .report-tree-detail { position: fixed; z-index: 20; right: 10px; bottom: 10px; left: 10px; max-height: min(60vh, 520px); margin: 0; box-shadow: var(--card-shadow); }
+  .report-games-actions { justify-content: flex-end; }
+  .report-eval-graph { max-height: 230px; }
+  .report-help-items { grid-template-columns: minmax(0, 1fr); }
+  .report-help-drawer { padding: 14px; }
+  .report-help-heading { top: -14px; }
+}
