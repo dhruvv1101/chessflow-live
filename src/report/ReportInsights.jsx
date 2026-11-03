@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { buildMoveExplanation } from './explanations.js';
 import RadialOpeningTree from './RadialOpeningTree.jsx';
+import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
 
 function formatChange(value) {
   if (!Number.isFinite(value)) return '—';
@@ -94,7 +95,7 @@ export default function ReportInsights({ leaks, openingRows, firstMistakes, tree
     </section>;
   };
   return <section className="report-insights" aria-labelledby="report-insights-title">
-    <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div></div>
+    <div className="section-heading"><div><p className="meta-line">ON-DEVICE ANALYSIS</p><h2 id="report-insights-title">Report insights</h2></div><ReportHelpTrigger label="How to read this report"/></div>
     <section className="report-insight-section" aria-labelledby="report-opening-table-title">
       <RadialOpeningTree tree={tree} leaks={leaks} highlightedPositionKeys={highlightedPositionKeys} status={openingStatus} onShowGames={(gameId) => onFilterGames([gameId])}/>
       <h3 id="report-opening-table-title">Opening performance</h3>

@@ -14,6 +14,7 @@ import { loadOpeningDatabase } from '../openings.js';
 import { attachOpeningContexts, buildOpeningTree, buildOpeningSummary } from './tree.js';
 import { detectLeaks } from './leaks.js';
 import { summarizeFirstBigMistakes } from './firstBigMistake.js';
+import { ReportHelpProvider } from './ReportHelpDrawer.jsx';
 
 function countLabel(count, singular, plural = `${singular}s`) {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -155,14 +156,14 @@ export default function ReportPage() {
     </details>
 
     <ReportFilters games={games} shownCount={filtered.games.length} value={filters} onChange={setFilters} loading={loading} error={storageError}/>
-    <ReportInsights
+    <ReportHelpProvider><ReportInsights
       leaks={insights?.leaks || []} openingRows={insights?.openingRows || []}
       tree={insights?.tree}
       firstMistakes={insights?.firstMistakes || { gamesLost: 0, gamesWithFirstMistake: 0, entries: [] }}
       openingStatus={!filtered.games.length ? 'empty' : openingStatus === 'error' ? 'error' : openingStatus === 'ready' ? 'ready' : 'loading'}
       leaksStatus={!filtered.games.length ? 'empty' : analysisStatus === 'error' ? 'error' : !filtered.rows.length ? 'loading' : 'ready'}
       onFilterGames={setSelectedGameIds}
-    />
+    /></ReportHelpProvider>
 
     <ReportGames games={filtered.games} totalGames={games.length} rows={insights?.analysisRows || []} analysisStatus={analysisStatus} loadingStorage={loading} storageError={storageError} busy={busy} selectedGameIds={selectedGameIds} onClearFilter={() => setSelectedGameIds(null)} onDelete={deleteImportedData}/>
 

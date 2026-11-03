@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useEntitlement } from './useEntitlement.js';
 import { buildRadialLayout, fitRadialView, moveTreeSelection, treePathIds, visibleTreeTable } from './radialLayout.js';
+import { ReportHelpTrigger } from './ReportHelpDrawer.jsx';
 
 const PIECES = { K: '♔', Q: '♕', R: '♖', B: '♗', N: '♘', P: '♙', k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' };
 
@@ -190,8 +191,8 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
       : status === 'error' ? <p className="folder-card report-insight-empty" role="alert">Opening data could not be loaded. Imported games remain available.</p>
         : status === 'empty' || !tree || !tree.nodes || !tree.nodes.length ? <p className="folder-card report-insight-empty">No positions are ready for this side yet.</p> : <>
           <div className="report-tree-controls">
-            <label className="setting-select">Visible depth <input aria-label="Visible depth in plies" type="range" min="1" max="24" value={maxDepth} onChange={(event) => changeDepth(Number(event.target.value))}/><span>{maxDepth} plies</span></label>
-            <label className="report-tree-check"><input type="checkbox" checked={showLowConfidence} onChange={(event) => { setShowLowConfidence(event.target.checked); setViews((current) => ({ ...current, [color]: null })); }}/> Show below-minimum lines</label>
+            <label className="setting-select">Visible depth <ReportHelpTrigger label="What visible depth means"/><input aria-label="Visible depth in plies" type="range" min="1" max="24" value={maxDepth} onChange={(event) => changeDepth(Number(event.target.value))}/><span>{maxDepth} plies</span></label>
+            <label className="report-tree-check"><input type="checkbox" checked={showLowConfidence} onChange={(event) => { setShowLowConfidence(event.target.checked); setViews((current) => ({ ...current, [color]: null })); }}/> Show below-minimum lines <ReportHelpTrigger label="Why low-confidence lines are hidden"/></label>
             <button className="button button-outline" type="button" aria-pressed={tableView} onClick={() => setTableView((value) => !value)}>{tableView ? 'Radial view' : 'Table view'}</button>
             {!tableView && <div className="report-tree-zoom" aria-label="Tree zoom controls"><button className="button button-outline" type="button" aria-label="Zoom in" onClick={() => adjustZoom(1.2)}>+</button><button className="button button-outline" type="button" aria-label="Zoom out" onClick={() => adjustZoom(1 / 1.2)}>−</button><button className="button button-outline" type="button" onClick={resetFit}>Reset (fit)</button></div>}
           </div>
@@ -222,7 +223,7 @@ export default function RadialOpeningTree({ tree, leaks = [], highlightedPositio
             </svg>}
             <details className="report-tree-legend" open>
               <summary>How to read the tree</summary>
-              <div className="report-tree-legend-content"><span><i className="report-legend-worse"/> Worse than expected</span><span><i className="report-legend-neutral"/> About as expected</span><span><i className="report-legend-better"/> Better than expected</span><span><i className="report-legend-size"/> Dot size = games</span><span><i className="report-legend-leak"/> Thick outline/dot = leak</span><span><i className="report-legend-low"/> Dashed outline = low confidence</span></div>
+              <div className="report-tree-legend-content"><ReportHelpTrigger label="How to interpret tree rings and dots"/><span><i className="report-legend-worse"/> Worse than expected</span><span><i className="report-legend-neutral"/> About as expected</span><span><i className="report-legend-better"/> Better than expected</span><span><i className="report-legend-size"/> Dot size = games</span><span><i className="report-legend-leak"/> Thick outline/dot = leak</span><span><i className="report-legend-low"/> Dashed outline = low confidence</span></div>
             </details>
           </div>
           {selected && <aside className="folder-card report-tree-detail" aria-label="Selected position details">

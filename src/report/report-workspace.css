@@ -47,6 +47,16 @@
 .report-tree-opening-label { fill: var(--purple); font-size: 8px; }
 .report-tree-root-label { fill: var(--text); stroke-width: 4px; font-size: 12px; font-weight: 950; }
 .report-tree-root-label:focus-visible { stroke: var(--surface); stroke-width: 4px; text-decoration: underline; text-decoration-color: var(--text); text-decoration-thickness: 3px; text-underline-offset: 4px; outline: none; }
+.report-help-trigger { display: inline-grid; width: 23px; min-width: 23px; height: 23px; min-height: 23px; padding: 0; place-items: center; border-radius: 50%; font-size: 12px; line-height: 1; vertical-align: middle; }
+.report-help-trigger:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.report-help-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--shadow) 72%, transparent); }
+.report-help-drawer { width: min(760px, 100%); max-height: min(86vh, 820px); overflow: auto; padding: 20px; color: var(--text); background: var(--surface); box-shadow: var(--card-shadow); }
+.report-help-heading { position: sticky; top: -20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; background: var(--surface); }
+.report-help-heading h2 { margin: 2px 0; }
+.report-help-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.report-help-items article { min-width: 0; padding: 10px 12px; border: var(--line); border-radius: var(--card-radius); background: var(--surface-alt); }
+.report-help-items h3 { margin: 0 0 5px; font-size: 13px; }
+.report-help-items p { margin: 0; color: var(--text); font-size: 12px; line-height: 1.5; }
 .report-tree-legend { margin-top: 8px; padding: 8px 3px 2px; border-top: var(--line); color: var(--text); font-size: 10px; font-weight: 750; }
 .report-tree-legend summary { width: fit-content; cursor: pointer; }
 .report-tree-legend summary:focus-visible { outline: 3px solid var(--focus-color, var(--pink)); outline-offset: 3px; }
@@ -117,4 +127,7 @@
   .report-tree-view-layout .report-tree-detail { position: fixed; z-index: 20; right: 10px; bottom: 10px; left: 10px; max-height: min(60vh, 520px); margin: 0; box-shadow: var(--card-shadow); }
   .report-games-actions { justify-content: flex-end; }
   .report-eval-graph { max-height: 230px; }
+  .report-help-items { grid-template-columns: minmax(0, 1fr); }
+  .report-help-drawer { padding: 14px; }
+  .report-help-heading { top: -14px; }
 }
