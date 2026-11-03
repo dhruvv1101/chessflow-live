@@ -33,7 +33,8 @@ test('save, edit, export, import and delete a local report lesson', async ({ pag
   await page.getByLabel('Chess.com username').fill('TestPlayer');
   await page.getByRole('button', { name: 'Import games' }).click();
   await expect(page.locator('.report-tree-node').first()).toBeVisible({ timeout: 30_000 });
-  await page.locator('.report-tree-node').first().click();
+  await page.locator('.report-tree-node').first().focus();
+  await page.keyboard.press('Enter');
   await page.getByRole('complementary', { name: 'Selected position details' }).getByRole('button', { name: 'Save as lesson' }).click();
   const editor = page.getByRole('dialog', { name: 'Save as lesson' });
   await expect(editor).toBeVisible();
